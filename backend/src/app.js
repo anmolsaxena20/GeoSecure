@@ -17,7 +17,7 @@ app.use(express.urlencoded({ extended: false }));
 app.use(cookieParser());
 app.use(passport.initialize());
 
-app.get("/health", (_req, res) => {
+app.get("/", (_req, res) => {
   return res.status(200).json({ ok: true });
 });
 
