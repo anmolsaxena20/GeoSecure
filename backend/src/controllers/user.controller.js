@@ -1,5 +1,6 @@
 import bcrypt from "bcryptjs";
 import { prisma } from "../config/db.config.js";
+import cloudinary from "../config/cloudinary.config.js";
 import { updatePasswordSchema } from "../validation/auth.validation.js";
 import { updateMeSchema, userIdSchema } from "../validation/user.validation.js";
 
@@ -101,6 +102,35 @@ export const updateMe = async (req, res, next) => {
   }
 };
 
+export const getUploadUrl = async (req, res, next) => {
+  try {
+    const timestamp = Math.floor(Date.now() / 1000);
+
+    const paramsToSign = {
+      folder: "profile",
+      timestamp,
+    };
+
+    const signature = cloudinary.utils.api_sign_request(
+      paramsToSign,
+      process.env.CLOUDINARY_API_SECRET,
+    );
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        cloudName: process.env.CLOUDINARY_CLOUD_NAME,
+        apiKey: process.env.CLOUDINARY_API_KEY,
+        timestamp,
+        folder: "profile",
+        signature,
+        uploadUrl: `https://api.cloudinary.com/v1_1/${process.env.CLOUDINARY_CLOUD_NAME}/image/upload`,
+      },
+    });
+  } catch (error) {
+    return next(error);
+  }
+};
 export const updatePassword = async (req, res, next) => {
   try {
     const parsed = updatePasswordSchema.safeParse(req.body);
