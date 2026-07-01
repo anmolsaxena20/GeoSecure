@@ -10,20 +10,32 @@ generator client {
 
 datasource db {
   provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum ThemePreference {
+  LIGHT
+  DARK
+  SYSTEM
+}
+
+enum AuthProvider {
+  LOCAL
+  GOOGLE
+  GITHUB
+  FACEBOOK
 }
 
 model User {
-  id    Int     @id @default(autoincrement())
-  email String  @unique
-  name  String?
-  posts Post[]
-}
-
-model Post {
-  id        Int     @id @default(autoincrement())
-  title     String
-  content   String?
-  published Boolean @default(false)
-  author    User    @relation(fields: [authorId], references: [id])
-  authorId  Int
+  id              Int             @id @default(autoincrement())
+  name            String?
+  email           String          @unique
+  password        String
+  isVerified      Boolean         @default(false)
+  refreshToken    String?
+  imageUrl        String          @default("default")
+  themePreference ThemePreference @default(SYSTEM)
+  authProvider    AuthProvider    @default(LOCAL)
+  googleId        String?         @unique
+  createdAt       DateTime        @default(now())
 }

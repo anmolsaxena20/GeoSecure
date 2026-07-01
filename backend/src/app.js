@@ -1,40 +1,29 @@
-import { prisma } from "./config/db.config.js";
+import cookieParser from "cookie-parser";
+import cors from "cors";
+import express from "express";
+import passport from "passport";
+import "./config/passport.config.js";
+import { errorHandler, notFound } from "./middlewares/error.middleware.js";
+import { authRouter } from "./routes/auth.routes.js";
+import { userRouter } from "./routes/user.routes.js";
+import { requireAuth } from "./middlewares/auth.middleware.js";
 
-async function main() {
-  // Create a new user with a post
-  const user = await prisma.user.create({
-    data: {
-      name: "Alice",
-      email: "alice@prisma.io",
-      posts: {
-        create: {
-          title: "Hello World",
-          content: "This is my first post!",
-          published: true,
-        },
-      },
-    },
-    include: {
-      posts: true,
-    },
-  });
-  console.log("Created user:", user);
+const app = express();
 
-  // Fetch all users with their posts
-  const allUsers = await prisma.user.findMany({
-    include: {
-      posts: true,
-    },
-  });
-  console.log("All users:", JSON.stringify(allUsers, null, 2));
-}
+app.set("trust proxy", true);
+app.use(cors({ origin: process.env.FRONTEND_URL, credentials: true }));
+app.use(express.json());
+app.use(express.urlencoded({ extended: false }));
+app.use(cookieParser());
+app.use(passport.initialize());
 
-main()
-  .then(async () => {
-    await prisma.$disconnect();
-  })
-  .catch(async (e) => {
-    console.error(e);
-    await prisma.$disconnect();
-    process.exit(1);
-  });
+app.get("/health", (_req, res) => {
+  return res.status(200).json({ ok: true });
+});
+
+app.use("/auth", authRouter);
+app.use("/users", requireAuth, userRouter);
+app.use(notFound);
+app.use(errorHandler);
+
+export { app };
