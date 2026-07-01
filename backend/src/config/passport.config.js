@@ -68,6 +68,7 @@ if (googleOAuthEnabled) {
           const user = await prisma.user.create({
             data: {
               name: profile.displayName || null,
+              imageUrl: profile.photos?.[0]?.value ?? null,
               email,
               password,
               authProvider: "GOOGLE",

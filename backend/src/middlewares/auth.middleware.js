@@ -18,7 +18,7 @@ export const requireAuth = async (req, res, next) => {
         name: true,
         email: true,
         isVerified: true,
-        cloudinaryUrl: true,
+        imageUrl: true,
         themePreference: true,
         authProvider: true,
         googleId: true,
