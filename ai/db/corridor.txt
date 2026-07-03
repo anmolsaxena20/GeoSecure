@@ -1,0 +1,7 @@
+CREATE TABLE corridor_risk_scores (
+    id SERIAL PRIMARY KEY,
+    corridor_name VARCHAR(100) UNIQUE,
+    disruption_probability INTEGER,
+    risk_level VARCHAR(20),
+    updated_at TIMESTAMP DEFAULT NOW()
+);
