@@ -27,20 +27,20 @@ server.addService(proto.ai.AIService.service, {
 
 const startGrpcServer = () => {
   return new Promise((resolve, reject) => {
+    const port = process.env.PORT || 8000;
+
     server.bindAsync(
-      process.env.GRPC_PORT || "localhost:8000",
+      `0.0.0.0:${port}`,
       grpc.ServerCredentials.createInsecure(),
-      (err, port) => {
+      (err, boundPort) => {
         if (err) {
-          reject(err);
+          console.error(err);
           return;
         }
 
         server.start();
 
-        console.log(`gRPC AI Server running on port ${port}`);
-
-        resolve(server);
+        console.log(`gRPC server listening on ${boundPort}`);
       },
     );
   });
