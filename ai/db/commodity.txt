@@ -1,0 +1,7 @@
+CREATE TABLE commodity_risk_scores (
+    id SERIAL PRIMARY KEY,
+    commodity VARCHAR(50) UNIQUE,
+    disruption_probability INTEGER,
+    risk_level VARCHAR(20),
+    updated_at TIMESTAMP DEFAULT NOW()
+);
