@@ -524,7 +524,7 @@ function CrosshairMark() {
   );
 }
 
-export default function GeoSecureHome() {
+export default function GeoSecureHome({ isAuthenticated, onLogout }) {
   const [selectedLocation, setSelectedLocation] = useState(null);
 
   const tickerItems = [
@@ -606,12 +606,23 @@ export default function GeoSecureHome() {
             </a>
           </div>
           <div className="flex items-center gap-3">
-            <Link to="/login" className="font-mono text-xs uppercase tracking-widest text-[#8fa3ad] transition-colors hover:text-[#e8f1f2]">
-              Sign in
-            </Link>
-            <button className="rounded-sm border border-[#4ff0d7]/40 bg-[#4ff0d7]/10 px-4 py-2 font-mono text-xs uppercase tracking-widest text-[#4ff0d7] transition-colors hover:bg-[#4ff0d7]/20">
-              Get access
-            </button>
+            {isAuthenticated ? (
+              <button
+                onClick={onLogout}
+                className="rounded-sm bg-red-500/20 border border-red-500/40 px-4 py-2 font-mono text-xs uppercase tracking-widest text-red-400 transition-colors hover:bg-red-500/30 hover:border-red-500/60"
+              >
+                Logout
+              </button>
+            ) : (
+              <>
+                <Link to="/login" className="font-mono text-xs uppercase tracking-widest text-[#8fa3ad] transition-colors hover:text-[#e8f1f2]">
+                  Sign in
+                </Link>
+                <button className="rounded-sm border border-[#4ff0d7]/40 bg-[#4ff0d7]/10 px-4 py-2 font-mono text-xs uppercase tracking-widest text-[#4ff0d7] transition-colors hover:bg-[#4ff0d7]/20">
+                  Get access
+                </button>
+              </>
+            )}
           </div>
         </nav>
 
