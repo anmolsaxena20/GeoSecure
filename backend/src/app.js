@@ -21,8 +21,8 @@ app.get("/", (_req, res) => {
   return res.status(200).json({ ok: true });
 });
 
-app.use("/auth", authRouter);
-app.use("/users", requireAuth, userRouter);
+app.use("/api/auth", authRouter);
+app.use("/api/users", requireAuth, userRouter);
 app.use(notFound);
 app.use(errorHandler);
 

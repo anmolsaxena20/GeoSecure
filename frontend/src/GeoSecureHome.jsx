@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
+import { Link } from "react-router-dom";
 import * as THREE from "three";
 
 /* ----------------------------------------------------------------------
@@ -605,9 +606,9 @@ export default function GeoSecureHome() {
             </a>
           </div>
           <div className="flex items-center gap-3">
-            <button className="font-mono text-xs uppercase tracking-widest text-[#8fa3ad] transition-colors hover:text-[#e8f1f2]">
+            <Link to="/login" className="font-mono text-xs uppercase tracking-widest text-[#8fa3ad] transition-colors hover:text-[#e8f1f2]">
               Sign in
-            </button>
+            </Link>
             <button className="rounded-sm border border-[#4ff0d7]/40 bg-[#4ff0d7]/10 px-4 py-2 font-mono text-xs uppercase tracking-widest text-[#4ff0d7] transition-colors hover:bg-[#4ff0d7]/20">
               Get access
             </button>
