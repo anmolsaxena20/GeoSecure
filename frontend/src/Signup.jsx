@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
+import { API_ENDPOINTS } from "./config/api.js";
 
 /**
  * GeoSecure Sign Up Page
@@ -66,6 +67,22 @@ const Signup = ({ onSignupSuccess }) => {
       setError("Password must be at least 8 characters long");
       return false;
     }
+    const hasUpperCase = /[A-Z]/.test(formData.password);
+    const hasLowerCase = /[a-z]/.test(formData.password);
+    const hasSpecialChar = /[^A-Za-z0-9]/.test(formData.password);
+    
+    if (!hasUpperCase) {
+      setError("Password must contain at least one uppercase letter");
+      return false;
+    }
+    if (!hasLowerCase) {
+      setError("Password must contain at least one lowercase letter");
+      return false;
+    }
+    if (!hasSpecialChar) {
+      setError("Password must contain at least one special character");
+      return false;
+    }
     if (formData.password !== formData.confirmPassword) {
       setError("Passwords do not match");
       return false;
@@ -88,15 +105,19 @@ const Signup = ({ onSignupSuccess }) => {
     setLoading(true);
 
     try {
-      const response = await fetch("http://localhost:3000/api/auth/signup", {
+      // Combine firstName and lastName into name
+      const fullName = formData.lastName 
+        ? `${formData.firstName} ${formData.lastName}` 
+        : formData.firstName;
+
+      const response = await fetch(API_ENDPOINTS.AUTH.SIGNUP, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         credentials: "include",
         body: JSON.stringify({
-          firstName: formData.firstName,
-          lastName: formData.lastName,
+          name: fullName,
           email: formData.email,
           password: formData.password,
         }),
@@ -128,7 +149,7 @@ const Signup = ({ onSignupSuccess }) => {
   };
 
   const handleGoogleSignup = () => {
-    window.location.href = "http://localhost:3000/api/auth/google";
+    window.location.href = API_ENDPOINTS.AUTH.GOOGLE;
   };
 
   return (
@@ -349,7 +370,7 @@ const Signup = ({ onSignupSuccess }) => {
                   </button>
                 </div>
                 <p className="mt-1 font-mono text-xs text-[#5c7078]">
-                  Minimum 8 characters
+                  Minimum 8 characters, with uppercase, lowercase, and special character
                 </p>
               </div>
 
