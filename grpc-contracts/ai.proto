@@ -1,0 +1,14 @@
+syntax = "proto3";
+package ai ;
+
+import "google/protobuf/empty.proto";
+
+service AIService{
+    rpc GenerateReport(google.protobuf.Empty) returns (ReportResponse);
+    rpc FetchMarketData(google.protobuf.Empty) returns (FetchMarketResponse);
+    rpc FetchNews(google.protobuf.Empty) returns (FetchNewsResponse);
+}
+
+message ReportResponse{}
+message FetchMarketResponse{}
+message FetchNewsResponse{}

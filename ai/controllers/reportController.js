@@ -3,9 +3,10 @@ import { fetchMarketData } from "./marketController.js";
 import { buildReport } from "../services/reportService.js";
 
 export async function generateSupplyChainReport() {
-    const news = await fetchAllNews();
+  console.log("generate report request received");
+  const news = await fetchAllNews();
 
-    const market = await fetchMarketData();
+  const market = await fetchMarketData();
 
-    return await buildReport(news, market);
+  return await buildReport(news, market);
 }
