@@ -1,0 +1,55 @@
+{
+  "_comment": "Major maritime oil chokepoints. 'bbox' = [min_lon, min_lat, max_lon, max_lat]. 'detour_days' = extra transit days to India if this corridor is avoided. 'daily_oil_mbd' = approx million barrels/day of oil that transit it.",
+  "chokepoints": [
+    {
+      "id": "hormuz",
+      "name": "Strait of Hormuz",
+      "center": [56.25, 26.57],
+      "bbox": [55.0, 25.5, 57.5, 27.5],
+      "detour_days": 0,
+      "daily_oil_mbd": 21.0,
+      "keywords": ["hormuz", "persian gulf", "iran", "strait of hormuz"],
+      "note": "No practical seaborne detour for Gulf crude; closure is near-total disruption."
+    },
+    {
+      "id": "bab_el_mandeb",
+      "name": "Bab-el-Mandeb / Red Sea",
+      "center": [43.33, 12.58],
+      "bbox": [42.0, 11.0, 44.5, 15.0],
+      "detour_days": 12,
+      "daily_oil_mbd": 6.2,
+      "keywords": ["bab-el-mandeb", "red sea", "houthi", "yemen", "aden"],
+      "note": "Avoidable via Cape of Good Hope at ~10-14 extra days."
+    },
+    {
+      "id": "suez",
+      "name": "Suez Canal",
+      "center": [32.35, 30.5],
+      "bbox": [32.0, 29.9, 32.7, 31.3],
+      "detour_days": 12,
+      "daily_oil_mbd": 5.5,
+      "keywords": ["suez", "suez canal", "egypt"],
+      "note": "Reroute around Africa adds ~10-14 days."
+    },
+    {
+      "id": "malacca",
+      "name": "Strait of Malacca",
+      "center": [100.4, 2.5],
+      "bbox": [98.5, 1.0, 104.0, 6.0],
+      "detour_days": 3,
+      "daily_oil_mbd": 16.0,
+      "keywords": ["malacca", "singapore", "malaysia", "indonesia"],
+      "note": "Lombok/Sunda detour adds ~2-4 days."
+    },
+    {
+      "id": "cape",
+      "name": "Cape of Good Hope",
+      "center": [18.47, -34.36],
+      "bbox": [16.0, -36.0, 22.0, -33.0],
+      "detour_days": 0,
+      "daily_oil_mbd": 5.0,
+      "keywords": ["cape of good hope", "south africa", "cape town"],
+      "note": "The detour route itself; rarely the disruption point."
+    }
+  ]
+}

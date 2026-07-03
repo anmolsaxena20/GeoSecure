@@ -1,0 +1,13 @@
+# --- secrets & local env (NEVER commit) ---
+.env
+.venv/
+venv/
+
+# --- python caches ---
+__pycache__/
+*.pyc
+
+# NOTE: trained model (models/artifacts/*.joblib) and data (data/) ARE committed
+# on purpose — they're tiny (~2 MB) and let teammates/judges clone-and-run the
+# service instantly without re-fetching GDELT (which is slow + rate-limited).
+# Regenerate anytime with:  python pipeline.py

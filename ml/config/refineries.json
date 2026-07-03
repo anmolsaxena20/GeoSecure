@@ -1,0 +1,45 @@
+{
+  "_comment": "Representative Indian refineries with crude-slate compatibility. api_min/api_max = acceptable crude API gravity. sulfur_max_pct = max sulfur the config handles. capacity_kbd = nameplate thousand barrels/day. A supplier crude is compatible if its API gravity and sulfur fall within these bounds.",
+  "refineries": [
+    {
+      "id": "jamnagar",
+      "name": "Jamnagar (Reliance)",
+      "location": [22.47, 69.08],
+      "capacity_kbd": 1240,
+      "api_min": 18.0,
+      "api_max": 45.0,
+      "sulfur_max_pct": 3.5,
+      "note": "High-complexity; can run heavy sour crude."
+    },
+    {
+      "id": "vadinar",
+      "name": "Vadinar (Nayara)",
+      "location": [22.28, 69.72],
+      "capacity_kbd": 405,
+      "api_min": 20.0,
+      "api_max": 42.0,
+      "sulfur_max_pct": 3.0,
+      "note": "Medium-high complexity."
+    },
+    {
+      "id": "paradip",
+      "name": "Paradip (IOCL)",
+      "location": [20.27, 86.61],
+      "capacity_kbd": 300,
+      "api_min": 22.0,
+      "api_max": 40.0,
+      "sulfur_max_pct": 2.5,
+      "note": "East coast; well placed for non-Gulf imports."
+    },
+    {
+      "id": "mangalore",
+      "name": "Mangalore (MRPL)",
+      "location": [12.91, 74.81],
+      "capacity_kbd": 300,
+      "api_min": 24.0,
+      "api_max": 40.0,
+      "sulfur_max_pct": 2.0,
+      "note": "Prefers medium sweet/sour."
+    }
+  ]
+}

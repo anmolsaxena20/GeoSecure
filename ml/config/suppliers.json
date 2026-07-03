@@ -1,0 +1,89 @@
+{
+  "_comment": "Representative crude suppliers to India. api/sulfur define the crude grade. base_price_usd = indicative landed FOB $/bbl. transit_days = nominal sea days to west-coast India. routes_through = chokepoint ids the cargo must transit (used to apply risk penalties). max_supply_kbd = how much this source can realistically lift.",
+  "suppliers": [
+    {
+      "id": "iraq_basrah",
+      "name": "Iraq — Basrah Heavy",
+      "country": "Iraq",
+      "origin": [29.6, 48.8],
+      "api": 24.7,
+      "sulfur": 3.9,
+      "base_price_usd": 78.0,
+      "transit_days": 7,
+      "routes_through": ["hormuz"],
+      "max_supply_kbd": 1100
+    },
+    {
+      "id": "saudi_arab_light",
+      "name": "Saudi Arabia — Arab Light",
+      "country": "Saudi Arabia",
+      "origin": [26.9, 49.6],
+      "api": 33.0,
+      "sulfur": 1.8,
+      "base_price_usd": 82.0,
+      "transit_days": 7,
+      "routes_through": ["hormuz"],
+      "max_supply_kbd": 900
+    },
+    {
+      "id": "uae_murban",
+      "name": "UAE — Murban",
+      "country": "UAE",
+      "origin": [24.4, 54.4],
+      "api": 40.0,
+      "sulfur": 0.8,
+      "base_price_usd": 85.0,
+      "transit_days": 6,
+      "routes_through": ["hormuz"],
+      "max_supply_kbd": 700
+    },
+    {
+      "id": "russia_urals",
+      "name": "Russia — Urals",
+      "country": "Russia",
+      "origin": [44.6, 37.9],
+      "api": 31.0,
+      "sulfur": 1.7,
+      "base_price_usd": 68.0,
+      "transit_days": 18,
+      "routes_through": ["suez", "bab_el_mandeb"],
+      "max_supply_kbd": 1600
+    },
+    {
+      "id": "nigeria_bonny",
+      "name": "Nigeria — Bonny Light",
+      "country": "Nigeria",
+      "origin": [4.4, 7.0],
+      "api": 35.3,
+      "sulfur": 0.15,
+      "base_price_usd": 86.0,
+      "transit_days": 18,
+      "routes_through": ["cape"],
+      "max_supply_kbd": 500
+    },
+    {
+      "id": "angola_girassol",
+      "name": "Angola — Girassol",
+      "country": "Angola",
+      "origin": [-8.4, 12.5],
+      "api": 31.4,
+      "sulfur": 0.33,
+      "base_price_usd": 84.0,
+      "transit_days": 20,
+      "routes_through": ["cape"],
+      "max_supply_kbd": 400
+    },
+    {
+      "id": "usa_wti_midland",
+      "name": "USA — WTI Midland",
+      "country": "USA",
+      "origin": [29.0, -94.9],
+      "api": 38.0,
+      "sulfur": 0.4,
+      "base_price_usd": 83.0,
+      "transit_days": 40,
+      "routes_through": ["cape"],
+      "max_supply_kbd": 600
+    }
+  ]
+}
