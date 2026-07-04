@@ -19,11 +19,42 @@ const packageDefinition = protoLoader.loadSync(
 const proto = grpc.loadPackageDefinition(packageDefinition);
 const aiProto = proto.ai;
 
+const serviceApiKey = process.env.AI_SERVICE_API_KEY;
+
+const missingApiKeyError = () => {
+  const error = new Error("AI_SERVICE_API_KEY is not configured");
+  error.code = grpc.status.FAILED_PRECONDITION;
+  return error;
+};
+
 const aiClient = new aiProto.AIService(
   process.env.AI_SERVICE_HOST || "127.0.0.1:8000",
   process.env.AI_SERVICE_USE_SSL === "true"
     ? grpc.credentials.createSsl()
     : grpc.credentials.createInsecure(),
 );
+
+const invokeUnary = (methodName, request = {}) => {
+  return new Promise((resolve, reject) => {
+    if (!serviceApiKey) {
+      reject(missingApiKeyError());
+      return;
+    }
+
+    const metadata = new grpc.Metadata();
+    metadata.set("x-api-key", serviceApiKey);
+
+    aiClient[methodName](request, metadata, (error, response) => {
+      if (error) {
+        reject(error);
+        return;
+      }
+
+      resolve(response);
+    });
+  });
+};
+
+export const aiGrpcCall = invokeUnary;
 
 export default aiClient;

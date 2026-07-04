@@ -32,10 +32,31 @@ const packageDefinition = protoLoader.loadSync(PROTO_PATH, {
 const proto = grpc.loadPackageDefinition(packageDefinition);
 
 const server = new grpc.Server();
+const expectedApiKey = process.env.AI_SERVICE_API_KEY;
 
 const encodeJson = (value) => ({ data_json: JSON.stringify(value ?? null) });
 
-const handleUnary = async (resolver, callback) => {
+const unauthenticatedError = () => {
+  const error = new Error("Unauthorized");
+  error.code = grpc.status.UNAUTHENTICATED;
+  return error;
+};
+
+const isAuthorized = (call) => {
+  if (!expectedApiKey) {
+    return false;
+  }
+
+  const apiKey = call.metadata.get("x-api-key")?.[0];
+  return typeof apiKey === "string" && apiKey === expectedApiKey;
+};
+
+const handleUnary = async (call, resolver, callback) => {
+  if (!isAuthorized(call)) {
+    callback(unauthenticatedError());
+    return;
+  }
+
   try {
     const result = await resolver();
     callback(null, encodeJson(result));
@@ -46,19 +67,20 @@ const handleUnary = async (resolver, callback) => {
 
 server.addService(proto.ai.AIService.service, {
   GenerateReport: (_call, callback) =>
-    handleUnary(generateSupplyChainReport, callback),
-  FetchMarketData: (_call, callback) => handleUnary(fetchMarketData, callback),
-  FetchNews: (_call, callback) => handleUnary(fetchAllNews, callback),
+    handleUnary(_call, generateSupplyChainReport, callback),
+  FetchMarketData: (call, callback) =>
+    handleUnary(call, fetchMarketData, callback),
+  FetchNews: (call, callback) => handleUnary(call, fetchAllNews, callback),
   RunDisruptionAgent: (_call, callback) =>
-    handleUnary(runDisruptionAgent, callback),
+    handleUnary(_call, runDisruptionAgent, callback),
   GetCorridorRiskScores: (_call, callback) =>
-    handleUnary(getCorridorRiskScores, callback),
+    handleUnary(_call, getCorridorRiskScores, callback),
   GetCommodityRiskScores: (_call, callback) =>
-    handleUnary(getCommodityRiskScores, callback),
+    handleUnary(_call, getCommodityRiskScores, callback),
   RunSupplyChainEconomiesAgent: (_call, callback) =>
-    handleUnary(runSupplyChainEconomiesAgent, callback),
+    handleUnary(_call, runSupplyChainEconomiesAgent, callback),
   GetHighRiskEvents: (_call, callback) =>
-    handleUnary(getHighRiskEvents, callback),
+    handleUnary(_call, getHighRiskEvents, callback),
 });
 
 const startGrpcServer = () => {

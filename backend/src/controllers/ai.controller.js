@@ -1,26 +1,23 @@
-import aiClient from "../config/grpc.config.js";
+import { aiGrpcCall } from "../config/grpc.config.js";
 
 const invokeGrpc = (methodName) => {
   return new Promise((resolve, reject) => {
-    aiClient[methodName]({}, (error, response) => {
-      if (error) {
-        reject(error);
-        return;
-      }
+    aiGrpcCall(methodName)
+      .then((response) => {
+        const payload = response?.data_json ?? null;
 
-      const payload = response?.data_json ?? null;
+        if (typeof payload !== "string") {
+          resolve(payload);
+          return;
+        }
 
-      if (typeof payload !== "string") {
-        resolve(payload);
-        return;
-      }
-
-      try {
-        resolve(JSON.parse(payload));
-      } catch {
-        resolve(payload);
-      }
-    });
+        try {
+          resolve(JSON.parse(payload));
+        } catch {
+          resolve(payload);
+        }
+      })
+      .catch(reject);
   });
 };
 
