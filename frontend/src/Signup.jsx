@@ -3,7 +3,7 @@ import { useNavigate, Link } from "react-router-dom";
 import { API_ENDPOINTS } from "./config/api.js";
 
 /**
- * GeoSecure Login Page
+ * GeoSecure Sign Up Page
  * Matches the geospatial security theme with cyan, amber, and deep space aesthetics
  */
 
@@ -27,36 +27,106 @@ function CrosshairMark() {
   );
 }
 
-const Login = ({ onLoginSuccess }) => {
+const Signup = ({ onSignupSuccess }) => {
   const navigate = useNavigate();
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const [formData, setFormData] = useState({
+    firstName: "",
+    lastName: "",
+    email: "",
+    password: "",
+    confirmPassword: "",
+    agreeTerms: false,
+  });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
+  const handleChange = (e) => {
+    const { name, value, type, checked } = e.target;
+    setFormData((prev) => ({
+      ...prev,
+      [name]: type === "checkbox" ? checked : value,
+    }));
+  };
+
+  const validateForm = () => {
+    if (!formData.firstName.trim()) {
+      setError("First name is required");
+      return false;
+    }
+    if (!formData.email.trim()) {
+      setError("Email is required");
+      return false;
+    }
+    if (!formData.password.trim()) {
+      setError("Password is required");
+      return false;
+    }
+    if (formData.password.length < 8) {
+      setError("Password must be at least 8 characters long");
+      return false;
+    }
+    const hasUpperCase = /[A-Z]/.test(formData.password);
+    const hasLowerCase = /[a-z]/.test(formData.password);
+    const hasSpecialChar = /[^A-Za-z0-9]/.test(formData.password);
+    
+    if (!hasUpperCase) {
+      setError("Password must contain at least one uppercase letter");
+      return false;
+    }
+    if (!hasLowerCase) {
+      setError("Password must contain at least one lowercase letter");
+      return false;
+    }
+    if (!hasSpecialChar) {
+      setError("Password must contain at least one special character");
+      return false;
+    }
+    if (formData.password !== formData.confirmPassword) {
+      setError("Passwords do not match");
+      return false;
+    }
+    if (!formData.agreeTerms) {
+      setError("You must agree to Terms of Service and Privacy Policy");
+      return false;
+    }
+    return true;
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
+
+    if (!validateForm()) {
+      return;
+    }
+
     setLoading(true);
 
     try {
-      const response = await fetch(API_ENDPOINTS.AUTH.LOGIN, {
+      // Combine firstName and lastName into name
+      const fullName = formData.lastName 
+        ? `${formData.firstName} ${formData.lastName}` 
+        : formData.firstName;
+
+      const response = await fetch(API_ENDPOINTS.AUTH.SIGNUP, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         credentials: "include",
         body: JSON.stringify({
-          email,
-          password,
+          name: fullName,
+          email: formData.email,
+          password: formData.password,
         }),
       });
 
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.message || "Login failed");
+        throw new Error(data.message || "Sign up failed");
       }
 
       // Store token if provided
@@ -65,8 +135,8 @@ const Login = ({ onLoginSuccess }) => {
       }
 
       // Call success callback
-      if (onLoginSuccess) {
-        onLoginSuccess(data);
+      if (onSignupSuccess) {
+        onSignupSuccess(data);
       }
 
       // Redirect to home
@@ -78,7 +148,7 @@ const Login = ({ onLoginSuccess }) => {
     }
   };
 
-  const handleGoogleLogin = () => {
+  const handleGoogleSignup = () => {
     window.location.href = API_ENDPOINTS.AUTH.GOOGLE;
   };
 
@@ -125,8 +195,8 @@ const Login = ({ onLoginSuccess }) => {
           </div>
         </nav>
 
-        {/* Login form container */}
-        <main className="flex flex-1 items-center justify-center px-6 lg:px-16">
+        {/* Signup form container */}
+        <main className="flex flex-1 items-center justify-center px-6 py-8 lg:px-16">
           <div className="w-full max-w-md">
             {/* Header */}
             <div className="mb-8 text-center">
@@ -136,7 +206,7 @@ const Login = ({ onLoginSuccess }) => {
                   height="48"
                   viewBox="0 0 100 100"
                   xmlns="http://www.w3.org/2000/svg"
-                  className="text-[#4ff0d7]"
+                  className="text-[#ffb454]"
                 >
                   <circle
                     cx="50"
@@ -201,9 +271,9 @@ const Login = ({ onLoginSuccess }) => {
                 </svg>
               </div>
               <h1 className="font-display text-3xl font-semibold tracking-tight">
-                Secure Access
+                Join GeoSecure
               </h1>
-              <p className="mt-2 font-mono text-xs uppercase tracking-[0.3em] text-[#4ff0d7]">
+              <p className="mt-2 font-mono text-xs uppercase tracking-[0.3em] text-[#ffb454]">
                 Geospatial Intelligence Platform
               </p>
             </div>
@@ -219,19 +289,55 @@ const Login = ({ onLoginSuccess }) => {
             )}
 
             {/* Form */}
-            <form onSubmit={handleSubmit} className="space-y-5">
+            <form onSubmit={handleSubmit} className="space-y-4">
+              {/* First Name */}
+              <div>
+                <label htmlFor="firstName" className="block font-mono text-xs uppercase tracking-widest text-[#8fa3ad]">
+                  First Name *
+                </label>
+                <input
+                  id="firstName"
+                  type="text"
+                  name="firstName"
+                  value={formData.firstName}
+                  onChange={handleChange}
+                  placeholder="John"
+                  className="mt-2 w-full rounded-sm border border-white/10 bg-white/5 px-4 py-3 font-mono text-sm text-[#e8f1f2] placeholder:text-[#5c7078] transition-colors focus:border-[#ffb454]/40 focus:bg-white/8 focus:outline-none focus:ring-1 focus:ring-[#ffb454]/20"
+                  required
+                  disabled={loading}
+                />
+              </div>
+
+              {/* Last Name */}
+              <div>
+                <label htmlFor="lastName" className="block font-mono text-xs uppercase tracking-widest text-[#8fa3ad]">
+                  Last Name
+                </label>
+                <input
+                  id="lastName"
+                  type="text"
+                  name="lastName"
+                  value={formData.lastName}
+                  onChange={handleChange}
+                  placeholder="Doe"
+                  className="mt-2 w-full rounded-sm border border-white/10 bg-white/5 px-4 py-3 font-mono text-sm text-[#e8f1f2] placeholder:text-[#5c7078] transition-colors focus:border-[#ffb454]/40 focus:bg-white/8 focus:outline-none focus:ring-1 focus:ring-[#ffb454]/20"
+                  disabled={loading}
+                />
+              </div>
+
               {/* Email */}
               <div>
                 <label htmlFor="email" className="block font-mono text-xs uppercase tracking-widest text-[#8fa3ad]">
-                  Email Address
+                  Email Address *
                 </label>
                 <input
                   id="email"
                   type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  name="email"
+                  value={formData.email}
+                  onChange={handleChange}
                   placeholder="security@geosecure.ai"
-                  className="mt-2 w-full rounded-sm border border-white/10 bg-white/5 px-4 py-3 font-mono text-sm text-[#e8f1f2] placeholder:text-[#5c7078] transition-colors focus:border-[#4ff0d7]/40 focus:bg-white/8 focus:outline-none focus:ring-1 focus:ring-[#4ff0d7]/20"
+                  className="mt-2 w-full rounded-sm border border-white/10 bg-white/5 px-4 py-3 font-mono text-sm text-[#e8f1f2] placeholder:text-[#5c7078] transition-colors focus:border-[#ffb454]/40 focus:bg-white/8 focus:outline-none focus:ring-1 focus:ring-[#ffb454]/20"
                   required
                   disabled={loading}
                 />
@@ -240,16 +346,17 @@ const Login = ({ onLoginSuccess }) => {
               {/* Password */}
               <div>
                 <label htmlFor="password" className="block font-mono text-xs uppercase tracking-widest text-[#8fa3ad]">
-                  Password
+                  Password *
                 </label>
                 <div className="relative mt-2">
                   <input
                     id="password"
                     type={showPassword ? "text" : "password"}
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
+                    name="password"
+                    value={formData.password}
+                    onChange={handleChange}
                     placeholder="••••••••"
-                    className="w-full rounded-sm border border-white/10 bg-white/5 px-4 py-3 font-mono text-sm text-[#e8f1f2] placeholder:text-[#5c7078] transition-colors focus:border-[#4ff0d7]/40 focus:bg-white/8 focus:outline-none focus:ring-1 focus:ring-[#4ff0d7]/20"
+                    className="w-full rounded-sm border border-white/10 bg-white/5 px-4 py-3 font-mono text-sm text-[#e8f1f2] placeholder:text-[#5c7078] transition-colors focus:border-[#ffb454]/40 focus:bg-white/8 focus:outline-none focus:ring-1 focus:ring-[#ffb454]/20"
                     required
                     disabled={loading}
                   />
@@ -257,35 +364,75 @@ const Login = ({ onLoginSuccess }) => {
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
                     disabled={loading}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-[#4ff0d7]/60 transition-colors hover:text-[#4ff0d7] disabled:opacity-50"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-[#ffb454]/60 transition-colors hover:text-[#ffb454] disabled:opacity-50"
                   >
                     {showPassword ? "🙈" : "👁"}
                   </button>
                 </div>
+                <p className="mt-1 font-mono text-xs text-[#5c7078]">
+                  Minimum 8 characters, with uppercase, lowercase, and special character
+                </p>
               </div>
 
-              {/* Remember & Forgot */}
-              <div className="flex items-center justify-between pt-2">
-                <label className="flex items-center gap-2 font-mono text-xs text-[#8fa3ad] transition-colors hover:text-[#e8f1f2] cursor-pointer">
+              {/* Confirm Password */}
+              <div>
+                <label htmlFor="confirmPassword" className="block font-mono text-xs uppercase tracking-widest text-[#8fa3ad]">
+                  Confirm Password *
+                </label>
+                <div className="relative mt-2">
+                  <input
+                    id="confirmPassword"
+                    type={showConfirmPassword ? "text" : "password"}
+                    name="confirmPassword"
+                    value={formData.confirmPassword}
+                    onChange={handleChange}
+                    placeholder="••••••••"
+                    className="w-full rounded-sm border border-white/10 bg-white/5 px-4 py-3 font-mono text-sm text-[#e8f1f2] placeholder:text-[#5c7078] transition-colors focus:border-[#ffb454]/40 focus:bg-white/8 focus:outline-none focus:ring-1 focus:ring-[#ffb454]/20"
+                    required
+                    disabled={loading}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    disabled={loading}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-[#ffb454]/60 transition-colors hover:text-[#ffb454] disabled:opacity-50"
+                  >
+                    {showConfirmPassword ? "🙈" : "👁"}
+                  </button>
+                </div>
+              </div>
+
+              {/* Terms & Conditions */}
+              <div className="pt-2">
+                <label className="flex items-start gap-3 font-mono text-xs text-[#8fa3ad] transition-colors hover:text-[#e8f1f2] cursor-pointer">
                   <input
                     type="checkbox"
-                    className="rounded border-[#4ff0d7]/30 bg-white/5 accent-[#4ff0d7]"
+                    name="agreeTerms"
+                    checked={formData.agreeTerms}
+                    onChange={handleChange}
+                    className="mt-1 rounded border-[#ffb454]/30 bg-white/5 accent-[#ffb454]"
+                    required
+                    disabled={loading}
                   />
-                  <span>Remember me</span>
+                  <span>
+                    I agree to the{" "}
+                    <a href="#terms" className="text-[#ffb454] hover:underline">
+                      Terms of Service
+                    </a>
+                    {" "}and{" "}
+                    <a href="#privacy" className="text-[#ffb454] hover:underline">
+                      Privacy Policy
+                    </a>
+                    *
+                  </span>
                 </label>
-                <a
-                  href="#forgot"
-                  className="font-mono text-xs text-[#4ff0d7] transition-colors hover:text-[#7bf5e1]"
-                >
-                  Forgot password?
-                </a>
               </div>
 
-              {/* Login Button */}
+              {/* Sign Up Button */}
               <button
                 type="submit"
                 disabled={loading}
-                className="mt-6 w-full rounded-sm bg-[#4ff0d7] px-6 py-3 font-mono text-xs font-semibold uppercase tracking-widest text-[#04141c] transition-colors hover:bg-[#7bf5e1] disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                className="mt-6 w-full rounded-sm bg-[#ffb454] px-6 py-3 font-mono text-xs font-semibold uppercase tracking-widest text-[#04141c] transition-colors hover:bg-[#ffc876] disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
                 {loading ? (
                   <>
@@ -293,11 +440,11 @@ const Login = ({ onLoginSuccess }) => {
                       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                       <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                     </svg>
-                    <span>Securing Access...</span>
+                    <span>Creating Account...</span>
                   </>
                 ) : (
                   <>
-                    <span>Access Secured</span>
+                    <span>Create Account</span>
                     <span>→</span>
                   </>
                 )}
@@ -316,36 +463,36 @@ const Login = ({ onLoginSuccess }) => {
             {/* Google OAuth */}
             <button
               type="button"
-              onClick={handleGoogleLogin}
+              onClick={handleGoogleSignup}
               disabled={loading}
-              className="w-full rounded-sm border border-white/10 bg-white/5 px-6 py-3 font-mono text-xs font-semibold uppercase tracking-widest text-[#e8f1f2] transition-colors hover:bg-white/10 hover:border-[#4ff0d7]/40 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              className="w-full rounded-sm border border-white/10 bg-white/5 px-6 py-3 font-mono text-xs font-semibold uppercase tracking-widest text-[#e8f1f2] transition-colors hover:bg-white/10 hover:border-[#ffb454]/40 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
-              <span>Sign in with Google</span>
+              <span>Sign up with Google</span>
               <span>G</span>
             </button>
 
             {/* Footer */}
             <div className="mt-8 space-y-4 border-t border-white/10 pt-6 text-center text-xs">
               <p className="text-[#8fa3ad]">
-                Don't have an account?{" "}
-                <Link to="/signup" className="text-[#4ff0d7] transition-colors hover:text-[#7bf5e1]">
-                  Create one
+                Already have an account?{" "}
+                <Link to="/login" className="text-[#ffb454] transition-colors hover:text-[#ffc876]">
+                  Sign in
                 </Link>
               </p>
               <p className="font-mono text-[10px] text-[#5c7078]">
-                By signing in, you agree to our{" "}
-                <a href="#terms" className="text-[#4ff0d7] hover:underline">
+                By signing up, you agree to our{" "}
+                <a href="#terms" className="text-[#ffb454] hover:underline">
                   Terms of Service
-                </a>{" "}
-                and{" "}
-                <a href="#privacy" className="text-[#4ff0d7] hover:underline">
+                </a>
+                {" "}and{" "}
+                <a href="#privacy" className="text-[#ffb454] hover:underline">
                   Privacy Policy
                 </a>
               </p>
             </div>
 
             {/* Security badge */}
-            <div className="mt-6 rounded-sm border border-[#4ff0d7]/20 bg-[#4ff0d7]/5 px-4 py-2 text-center font-mono text-xs text-[#4ff0d7]">
+            <div className="mt-6 rounded-sm border border-[#ffb454]/20 bg-[#ffb454]/5 px-4 py-2 text-center font-mono text-xs text-[#ffb454]">
               <span>🔒 Enterprise Grade Security</span>
             </div>
           </div>
@@ -353,8 +500,8 @@ const Login = ({ onLoginSuccess }) => {
 
         {/* Footer ticker */}
         <div className="flex items-center gap-6 border-t border-white/10 bg-black/30 px-6 py-3 backdrop-blur-sm lg:px-16">
-          <div className="flex shrink-0 items-center gap-2 font-mono text-[11px] uppercase tracking-widest text-[#4ff0d7]">
-            <span className="h-1.5 w-1.5 rounded-full bg-[#4ff0d7] animate-pulse" />
+          <div className="flex shrink-0 items-center gap-2 font-mono text-[11px] uppercase tracking-widest text-[#ffb454]">
+            <span className="h-1.5 w-1.5 rounded-full bg-[#ffb454] animate-pulse" />
             Secure
           </div>
           <div className="hidden shrink-0 font-mono text-[11px] uppercase tracking-widest text-[#5c7078] sm:block">
@@ -366,4 +513,4 @@ const Login = ({ onLoginSuccess }) => {
   );
 };
 
-export default Login;
+export default Signup;

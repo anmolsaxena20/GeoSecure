@@ -2,6 +2,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { useState, useEffect } from 'react'
 import GeoSecureHome from './GeoSecureHome.jsx'
 import Login from './Login.jsx'
+import Signup from './Signup.jsx'
 
 export default function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
@@ -49,6 +50,10 @@ export default function App() {
         <Route 
           path="/login" 
           element={isAuthenticated ? <Navigate to="/" /> : <Login onLoginSuccess={handleLoginSuccess} />} 
+        />
+        <Route 
+          path="/signup" 
+          element={isAuthenticated ? <Navigate to="/" /> : <Signup onSignupSuccess={handleLoginSuccess} />} 
         />
         <Route path="*" element={<Navigate to="/" />} />
       </Routes>
