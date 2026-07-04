@@ -1,5 +1,7 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
 import { useState, useEffect } from 'react'
+import {Analytics} from '@vercel/analytics/react'
+
 import GeoSecureHome from './GeoSecureHome.jsx'
 import Login from './Login.jsx'
 import Signup from './Signup.jsx'
@@ -41,6 +43,7 @@ export default function App() {
   }
 
   return (
+    <>
     <Router>
       <Routes>
         <Route 
@@ -58,5 +61,7 @@ export default function App() {
         <Route path="*" element={<Navigate to="/" />} />
       </Routes>
     </Router>
+    <Analytics />
+    </>
   )
 }
