@@ -3,6 +3,7 @@ import cors from "cors";
 import express from "express";
 import passport from "passport";
 import "./config/passport.config.js";
+import { disruptionRouter } from "./routes/disruption.routes.js";
 import { errorHandler, notFound } from "./middlewares/error.middleware.js";
 import { authRouter } from "./routes/auth.routes.js";
 import { userRouter } from "./routes/user.routes.js";
@@ -22,11 +23,9 @@ app.get("/", (_req, res) => {
 });
 
 app.use("/api/auth", authRouter);
+app.use("/api/disruption", requireAuth, disruptionRouter);
 app.use("/api/users", requireAuth, userRouter);
 app.use(notFound);
 app.use(errorHandler);
-
-
-
 
 export { app };
