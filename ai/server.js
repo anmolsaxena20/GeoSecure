@@ -1,7 +1,5 @@
-import grpc from "@grpc/grpc-js";
-import protoLoader from "@grpc/proto-loader";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
+import "dotenv/config";
+import express from "express";
 
 import { generateSupplyChainReport } from "./controllers/reportController.js";
 import { fetchAllNews } from "./controllers/newsController.js";
@@ -16,91 +14,120 @@ import {
   getHighRiskEvents,
 } from "./controllers/supplyChainEconomiesController.js";
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const PROTO_PATH = path.resolve(__dirname, "../grpc-contracts/ai.proto");
-const GRPC_PORT = process.env.AI_GRPC_PORT || 8000;
-
-const packageDefinition = protoLoader.loadSync(PROTO_PATH, {
-  keepCase: true,
-  longs: String,
-  enums: String,
-  defaults: true,
-  oneofs: true,
-});
-
-const proto = grpc.loadPackageDefinition(packageDefinition);
-
-const server = new grpc.Server();
+const app = express();
+const port = process.env.PORT || 8000;
 const expectedApiKey = process.env.AI_SERVICE_API_KEY;
 
-const encodeJson = (value) => ({ data_json: JSON.stringify(value ?? null) });
-
-const unauthenticatedError = () => {
-  const error = new Error("Unauthorized");
-  error.code = grpc.status.UNAUTHENTICATED;
-  return error;
+const sendJson = async (res, resolver) => {
+  const result = await resolver();
+  return res.status(200).json(result);
 };
 
-const isAuthorized = (call) => {
+const requireApiKey = (req, res, next) => {
   if (!expectedApiKey) {
-    return false;
+    return res
+      .status(500)
+      .json({ message: "AI_SERVICE_API_KEY is not configured" });
   }
 
-  const apiKey = call.metadata.get("x-api-key")?.[0];
-  return typeof apiKey === "string" && apiKey === expectedApiKey;
+  const apiKey = req.get("x-api-key");
+  if (apiKey !== expectedApiKey) {
+    return res.status(401).json({ message: "Unauthorized" });
+  }
+
+  return next();
 };
 
-const handleUnary = async (call, resolver, callback) => {
-  if (!isAuthorized(call)) {
-    callback(unauthenticatedError());
-    return;
-  }
+app.use(express.json());
 
-  try {
-    const result = await resolver();
-    callback(null, encodeJson(result));
-  } catch (error) {
-    callback(error);
-  }
-};
-
-server.addService(proto.ai.AIService.service, {
-  GenerateReport: (_call, callback) =>
-    handleUnary(_call, generateSupplyChainReport, callback),
-  FetchMarketData: (call, callback) =>
-    handleUnary(call, fetchMarketData, callback),
-  FetchNews: (call, callback) => handleUnary(call, fetchAllNews, callback),
-  RunDisruptionAgent: (_call, callback) =>
-    handleUnary(_call, runDisruptionAgent, callback),
-  GetCorridorRiskScores: (_call, callback) =>
-    handleUnary(_call, getCorridorRiskScores, callback),
-  GetCommodityRiskScores: (_call, callback) =>
-    handleUnary(_call, getCommodityRiskScores, callback),
-  RunSupplyChainEconomiesAgent: (_call, callback) =>
-    handleUnary(_call, runSupplyChainEconomiesAgent, callback),
-  GetHighRiskEvents: (_call, callback) =>
-    handleUnary(_call, getHighRiskEvents, callback),
+app.get("/", (_req, res) => {
+  return res.status(200).json({ ok: true });
 });
 
-const startGrpcServer = () => {
-  return new Promise((resolve, reject) => {
-    server.bindAsync(
-      `0.0.0.0:${GRPC_PORT}`,
-      grpc.ServerCredentials.createInsecure(),
-      (err, boundPort) => {
-        if (err) {
-          reject(err);
-          return;
-        }
+app.get("/api/ai/report", requireApiKey, async (_req, res, next) => {
+  try {
+    return await sendJson(res, generateSupplyChainReport);
+  } catch (error) {
+    return next(error);
+  }
+});
 
-        server.start();
+app.get("/api/ai/market", requireApiKey, async (_req, res, next) => {
+  try {
+    return await sendJson(res, fetchMarketData);
+  } catch (error) {
+    return next(error);
+  }
+});
 
-        console.log(`gRPC server listening on ${boundPort}`);
-        resolve(boundPort);
-      },
-    );
-  });
-};
+app.get("/api/ai/news", requireApiKey, async (_req, res, next) => {
+  try {
+    return await sendJson(res, fetchAllNews);
+  } catch (error) {
+    return next(error);
+  }
+});
 
-await startGrpcServer();
+app.post("/api/ai/disruption/run", requireApiKey, async (_req, res, next) => {
+  try {
+    return await sendJson(res, runDisruptionAgent);
+  } catch (error) {
+    return next(error);
+  }
+});
+
+app.get(
+  "/api/ai/disruption/corridors",
+  requireApiKey,
+  async (_req, res, next) => {
+    try {
+      return await sendJson(res, getCorridorRiskScores);
+    } catch (error) {
+      return next(error);
+    }
+  },
+);
+
+app.get(
+  "/api/ai/disruption/commodities",
+  requireApiKey,
+  async (_req, res, next) => {
+    try {
+      return await sendJson(res, getCommodityRiskScores);
+    } catch (error) {
+      return next(error);
+    }
+  },
+);
+
+app.post("/api/ai/economies/run", requireApiKey, async (_req, res, next) => {
+  try {
+    return await sendJson(res, runSupplyChainEconomiesAgent);
+  } catch (error) {
+    return next(error);
+  }
+});
+
+app.get(
+  "/api/ai/economies/high-risk-events",
+  requireApiKey,
+  async (_req, res, next) => {
+    try {
+      return await sendJson(res, getHighRiskEvents);
+    } catch (error) {
+      return next(error);
+    }
+  },
+);
+
+app.use((error, _req, res, _next) => {
+  console.error(error);
+  const status = error.status || error.statusCode || 500;
+  const message = error.message || "Internal Server Error";
+
+  return res.status(status).json({ message });
+});
+
+app.listen(port, () => {
+  console.log(`AI HTTP server listening on port ${port}`);
+});

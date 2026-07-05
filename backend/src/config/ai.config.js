@@ -1,0 +1,99 @@
+const routeMap = {
+  GenerateReport: { method: "GET", path: "/api/ai/report" },
+  FetchMarketData: { method: "GET", path: "/api/ai/market" },
+  FetchNews: { method: "GET", path: "/api/ai/news" },
+  RunDisruptionAgent: { method: "POST", path: "/api/ai/disruption/run" },
+  GetCorridorRiskScores: {
+    method: "GET",
+    path: "/api/ai/disruption/corridors",
+  },
+  GetCommodityRiskScores: {
+    method: "GET",
+    path: "/api/ai/disruption/commodities",
+  },
+  RunSupplyChainEconomiesAgent: {
+    method: "POST",
+    path: "/api/ai/economies/run",
+  },
+  GetHighRiskEvents: {
+    method: "GET",
+    path: "/api/ai/economies/high-risk-events",
+  },
+};
+
+const normalizeBaseUrl = (value) => {
+  const trimmed = `${value || ""}`.trim();
+
+  if (!trimmed) {
+    return "http://127.0.0.1:8000";
+  }
+
+  if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) {
+    return trimmed.replace(/\/$/, "");
+  }
+
+  return `http://${trimmed.replace(/\/$/, "")}`;
+};
+
+const serviceUrl = normalizeBaseUrl(
+  process.env.AI_SERVICE_URL || process.env.AI_SERVICE_HOST,
+);
+const serviceApiKey = process.env.AI_SERVICE_API_KEY;
+
+const missingApiKeyError = () => {
+  const error = new Error("AI_SERVICE_API_KEY is not configured");
+  error.status = 500;
+  return error;
+};
+
+const parseResponseBody = async (response) => {
+  const text = await response.text();
+
+  if (!text) {
+    return null;
+  }
+
+  try {
+    return JSON.parse(text);
+  } catch {
+    return text;
+  }
+};
+
+const invokeUnary = async (methodName, request = {}) => {
+  const route = routeMap[methodName];
+
+  if (!route) {
+    throw new Error(`Unsupported AI method: ${methodName}`);
+  }
+
+  if (!serviceApiKey) {
+    throw missingApiKeyError();
+  }
+
+  const response = await fetch(`${serviceUrl}${route.path}`, {
+    method: route.method,
+    headers: {
+      "content-type": "application/json",
+      "x-api-key": serviceApiKey,
+    },
+    body:
+      route.method === "GET" || Object.keys(request).length === 0
+        ? undefined
+        : JSON.stringify(request),
+  });
+
+  const payload = await parseResponseBody(response);
+
+  if (!response.ok) {
+    const error = new Error(
+      payload?.message || `AI request failed with ${response.status}`,
+    );
+    error.status = response.status;
+    throw error;
+  }
+
+  return payload;
+};
+
+export const aiHttpCall = invokeUnary;

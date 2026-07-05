@@ -22,6 +22,10 @@ app.get("/", (_req, res) => {
   return res.status(200).json({ ok: true });
 });
 
+app.get("/api/ai/health", (_req, res) => {
+  return res.status(200).json({ ok: true });
+});
+
 app.use("/api/auth", authRouter);
 app.use("/api/disruption", requireAuth, disruptionRouter);
 app.use("/api/users", requireAuth, userRouter);
