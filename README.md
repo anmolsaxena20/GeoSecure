@@ -7,7 +7,9 @@ A comprehensive platform combining geospatial analysis, AI-driven insights, and 
 GeoSecure is structured as a modular full-stack application with the following components:
 
 ### 📡 **ai/** - LLM & Agentic AI Layer
+
 Centralized AI and machine learning components including:
+
 - **Agents**: Multi-role agent orchestration (supply chain, market analysis, research, review)
 - **Configs**: LLM model configuration and tool definitions
 - **Services**: External API integrations (AlphaVantage, Guardian, GDELT, World Bank)
@@ -18,28 +20,27 @@ Centralized AI and machine learning components including:
 - **Database**: Event, article, and persistence layers
 
 ### 🔧 **backend/** - Node.js/Express Backend
+
 RESTful API and business logic:
+
 - **Authentication**: Passport.js configuration with multiple strategies
 - **Database**: Prisma ORM with migrations for user models and data persistence
 - **Controllers**: Auth and user management
-- **Services**: Core business logic integration
-- **gRPC**: Configuration for proto-based communication
+- **Services**: Core business logic integration and HTTP-based AI calls
 
 ### 💻 **frontend/** - React + Vite UI
+
 Modern, responsive user interface:
+
 - **Vite**: Fast development server and build tool
 - **Tailwind CSS**: Utility-first styling
 - **Components**: Login, Signup, Home pages
 - **Assets**: Images and static resources
 
-### 📋 **grpc-contracts/** - Protocol Buffers
-gRPC service definitions:
-- `ai.proto` - AI service interface
-- `ml.proto` - Machine learning service interface
-
 ## Quick Start
 
 ### Prerequisites
+
 - Node.js (v16 or higher)
 - npm or yarn
 - PostgreSQL (for backend database)
@@ -48,6 +49,7 @@ gRPC service definitions:
 ### Setup Instructions
 
 1. **Backend Setup**
+
    ```bash
    cd backend
    npm install
@@ -56,6 +58,7 @@ gRPC service definitions:
    ```
 
 2. **AI Module Setup**
+
    ```bash
    cd ai
    npm install
@@ -72,6 +75,7 @@ gRPC service definitions:
 ## Environment Configuration
 
 Ensure `.env` files are configured in each module:
+
 - `backend/.env` - Database, Redis, API credentials
 - `ai/.env` - LLM API keys, service credentials
 - `frontend/.env` - API endpoints
@@ -112,9 +116,6 @@ GeoSecure/
 │   │   ├── assets/        # Static files
 │   │   └── config/        # Frontend config
 │   └── package.json
-└── grpc-contracts/         # Proto definitions
-    ├── ai.proto
-    └── ml.proto
 ```
 
 ## Documentation
@@ -126,6 +127,7 @@ GeoSecure/
 ## API Documentation
 
 The backend exposes REST endpoints for:
+
 - User authentication and management
 - Market data queries
 - Report generation
@@ -136,7 +138,7 @@ The backend exposes REST endpoints for:
 - **Backend**: Node.js, Express, Prisma, PostgreSQL
 - **Frontend**: React, Vite, Tailwind CSS
 - **AI**: LLM integration, Agent orchestration
-- **Communication**: gRPC, REST APIs
+- **Communication**: REST APIs
 - **DevOps**: Docker-ready structure
 
 ## Contributing
@@ -153,6 +155,7 @@ The backend exposes REST endpoints for:
 ## Support
 
 For questions or issues:
+
 - Check existing documentation in module READMEs
 - Review the authentication setup guide
 - Run the verification script for troubleshooting
