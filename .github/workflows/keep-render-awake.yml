@@ -1,0 +1,16 @@
+name: Keep GeoSecure Backend Awake
+
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Ping backend
+        run: |
+          echo "Pinging GeoSecure backend..."
+          curl -i https://geosecure-backend.onrender.com
