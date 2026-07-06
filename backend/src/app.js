@@ -19,6 +19,7 @@ app.use(cookieParser());
 app.use(passport.initialize());
 
 app.get("/", (_req, res) => {
+  console.log("health check request received");
   return res.status(200).json({ ok: true });
 });
 
