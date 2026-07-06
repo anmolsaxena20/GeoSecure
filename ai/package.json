@@ -9,6 +9,7 @@
     "express": "^5.2.1",
     "node-cron": "^4.5.0",
     "pg": "^8.22.0",
+    "searoute-ts": "^2.2.0",
     "zod": "^4.4.3"
   },
   "devDependencies": {
