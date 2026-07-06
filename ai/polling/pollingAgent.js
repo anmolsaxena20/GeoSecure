@@ -9,49 +9,44 @@ import { saveArticle } from "../db/articles.js";
 import { saveEvent } from "../db/events.js";
 
 async function runCycle() {
+  console.log("Starting cycle");
 
-    console.log("Starting cycle");
+  const articles = await fetchGuardianNews(10);
 
-    const articles = await fetchGuardianNews(10);
+  for (const article of articles) {
+    const relevance = await classifyRelevance(article);
 
-    for(const article of articles){
-
-        const relevance = await classifyRelevance(article);
-
-        if(!relevance.relevant || relevance.score < 7){
-            console.log("Skipped:",article.headline);
-            continue;
-        }
-
-        const extracted = await extractEvent(article);
-
-        if(extracted.ignore){
-            continue;
-        }
-
-        const risk = calculateRisk(extracted);
-
-        const articleRow = await saveArticle(article);
-
-        await saveEvent(
-            articleRow.id,
-            {
-                ...extracted,
-                ...risk
-            }
-        );
-
-        console.log(
-            "Saved:",
-            extracted.event_type,
-            risk.risk_level,
-            article.headline
-        );
+    if (!relevance.relevant || relevance.score < 7) {
+      console.log("Skipped:", article.headline);
+      continue;
     }
+
+    const extracted = await extractEvent(article);
+
+    if (extracted.ignore) {
+      continue;
+    }
+
+    const risk = calculateRisk(extracted);
+
+    const articleRow = await saveArticle(article);
+
+    await saveEvent(articleRow.id, {
+      ...extracted,
+      ...risk,
+    });
+
+    console.log(
+      "Saved:",
+      extracted.event_type,
+      risk.risk_level,
+      article.headline,
+    );
+  }
 }
-
-cron.schedule("*/10 * * * *", async () => {
+export function startNewsCron() {
+  cron.schedule("*/30 * * * *", async () => {
+    console.log("running scheduled cron cycle");
     await runCycle();
-});
-
-runCycle();
+  });
+}

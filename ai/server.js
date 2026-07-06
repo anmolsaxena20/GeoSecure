@@ -13,6 +13,7 @@ import {
   runSupplyChainEconomiesAgent,
   getHighRiskEvents,
 } from "./controllers/supplyChainEconomiesController.js";
+import { startNewsCron } from "./polling/pollingAgent.js";
 
 const app = express();
 const port = process.env.PORT || 8000;
@@ -127,6 +128,8 @@ app.use((error, _req, res, _next) => {
 
   return res.status(status).json({ message });
 });
+
+startNewsCron();
 
 app.listen(port, () => {
   console.log(`AI HTTP server listening on port ${port}`);
