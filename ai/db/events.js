@@ -3,21 +3,28 @@ import { pool } from "./db.js";
 export async function saveEvent(articleId, event, client = pool) {
   await client.query(
     `
-    INSERT INTO events(
-      article_id,
-      event_type,
-      summary,
-      countries,
-      commodities,
-      transport_modes,
-      impacts,
-      recommendations,
-      risk_score,
-      risk_level
-    )
-    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
-    ON CONFLICT (article_id, event_type, summary)
-    DO NOTHING
+    INSERT INTO events (
+    article_id,
+    event_type,
+    summary,
+    countries,
+    commodities,
+    transport_modes,
+    impacts,
+    recommendations,
+    risk_score,
+    risk_level
+  )
+  VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+  ON CONFLICT (article_id, event_type, summary)
+  DO UPDATE SET
+    countries = EXCLUDED.countries,
+    commodities = EXCLUDED.commodities,
+    transport_modes = EXCLUDED.transport_modes,
+    impacts = EXCLUDED.impacts,
+    recommendations = EXCLUDED.recommendations,
+    risk_score = EXCLUDED.risk_score,
+    risk_level = EXCLUDED.risk_level;
     `,
     [
       articleId,
@@ -30,6 +37,6 @@ export async function saveEvent(articleId, event, client = pool) {
       JSON.stringify(event.recommendations ?? []),
       event.risk_score,
       event.risk_level,
-    ]
+    ],
   );
 }
