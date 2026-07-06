@@ -86,7 +86,7 @@ Ensure `.env` files are configured in each module:
 - 📊 **Market Analysis**: Real-time market data aggregation and insights
 - 🔐 **Secure Authentication**: JWT-based auth with multiple strategies
 - 💾 **Persistent Storage**: PostgreSQL backend with Prisma ORM
-- 🔄 **gRPC Communication**: Efficient inter-service communication
+- 🔄 **Microservice Architecture**: Efficient inter-service communication
 - 🧠 **Knowledge Management**: RAG pipeline for contextual AI responses
 - 📈 **Risk Assessment**: Supply chain and market risk evaluation
 
