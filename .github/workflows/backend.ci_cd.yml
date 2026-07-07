@@ -7,12 +7,14 @@ on:
     paths:
       - "backend/**"
 
+  workflow_dispatch:
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Deploy via SSH
+      - name: Deploy Backend via SSH
         uses: appleboy/ssh-action@v1.2.2
         with:
           host: ${{ secrets.EC2_HOST }}
@@ -22,36 +24,38 @@ jobs:
           script: |
             set -e
 
-            REPO="https://github.com/anmolsaxena20/GeoSecure.git"
+            echo "Changing to repository..."
+            cd ~/GeoSecure
 
-            if [ ! -d "$HOME/GeoSecure/.git" ]; then
-              echo "First deployment..."
+            echo "Current directory:"
+            pwd
 
-              mkdir -p "$HOME/GeoSecure"
-              cd "$HOME/GeoSecure"
+            echo "Pulling latest code..."
+            git fetch origin
+            git reset --hard origin/main
 
-              git init
-              git remote add origin $REPO
+            echo "Repository contents:"
+            ls -la
 
-              git config core.sparseCheckout true
-
-              echo "backend/" > .git/info/sparse-checkout
-
-              git pull origin main
-            else
-              echo "Updating repository..."
-
-              cd "$HOME/GeoSecure"
-              git pull origin main
-            fi
-
+            echo "Changing to backend..."
             cd backend
 
+            echo "Current directory:"
+            pwd
+
+            echo "Backend contents:"
+            ls -la
+
+            echo "Installing dependencies..."
             npm install
 
-            # Uncomment if applicable
+            # Uncomment if your backend has a build step
             # npm run build
 
+            echo "Restarting backend..."
             pm2 restart geosecure-backend || pm2 start server.js --name geosecure-backend
 
+            echo "Saving PM2 configuration..."
             pm2 save
+
+            echo "Deployment completed successfully!"
