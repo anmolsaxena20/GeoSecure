@@ -1,0 +1,57 @@
+name: Deploy Backend to EC2
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "backend/**"
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.2.2
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script_stop: true
+          script: |
+            set -e
+
+            REPO="https://github.com/anmolsaxena20/GeoSecure.git"
+
+            if [ ! -d "$HOME/GeoSecure/.git" ]; then
+              echo "First deployment..."
+
+              mkdir -p "$HOME/GeoSecure"
+              cd "$HOME/GeoSecure"
+
+              git init
+              git remote add origin $REPO
+
+              git config core.sparseCheckout true
+
+              echo "backend/" > .git/info/sparse-checkout
+
+              git pull origin main
+            else
+              echo "Updating repository..."
+
+              cd "$HOME/GeoSecure"
+              git pull origin main
+            fi
+
+            cd backend
+
+            npm install
+
+            # Uncomment if applicable
+            # npm run build
+
+            pm2 restart geosecure-backend || pm2 start server.js --name geosecure-backend
+
+            pm2 save
