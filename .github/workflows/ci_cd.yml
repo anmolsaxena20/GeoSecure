@@ -1,0 +1,42 @@
+name: Deploy to EC2
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.2.2
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script_stop: true
+          script: |
+            set -e
+
+            echo "Changing to project directory..."
+            cd ~/GeoSecure
+
+            echo "Pulling latest code..."
+            git fetch origin
+            git reset --hard origin/main
+
+            echo "Installing dependencies..."
+            npm install
+
+            # Uncomment if your project has a build step
+            # npm run build
+
+            echo "Restarting application..."
+            pm2 restart geosecure || pm2 start server.js --name geosecure
+
+            echo "Saving PM2 process list..."
+            pm2 save
+
+            echo "Deployment completed successfully!"
