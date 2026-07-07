@@ -1,12 +1,73 @@
 import { aiHttpCall } from "../config/ai.config.js";
+import { getRedisClient } from "../config/redis.config.js";
+
+const DISRUPTION_CACHE_TTL_SECONDS = Number(
+  process.env.DISRUPTION_CACHE_TTL_SECONDS || 300,
+);
+
+const disruptionCacheKeys = {
+  RunDisruptionAgent: "cache:disruption:run",
+  GetCorridorRiskScores: "cache:disruption:corridors",
+  GetCommodityRiskScores: "cache:disruption:commodities",
+};
+
+const parseCachedValue = (value) => {
+  if (value == null) {
+    return null;
+  }
+
+  try {
+    return JSON.parse(value);
+  } catch {
+    return value;
+  }
+};
 
 const invokeAiRoute = async (methodName) => {
   const response = await aiHttpCall(methodName);
   return response ?? null;
 };
 
-const sendAiResult = async (res, methodName) => {
+const getCachedAiResult = async (methodName) => {
+  const cacheKey = disruptionCacheKeys[methodName];
+
+  if (!cacheKey) {
+    return invokeAiRoute(methodName);
+  }
+
+  const redisClient = await getRedisClient();
+
+  if (redisClient) {
+    try {
+      const cachedValue = await redisClient.get(cacheKey);
+
+      if (cachedValue !== null) {
+        return parseCachedValue(cachedValue);
+      }
+    } catch (error) {
+      console.error(`Redis cache read failed for ${cacheKey}:`, error);
+    }
+  }
+
   const result = await invokeAiRoute(methodName);
+
+  if (redisClient) {
+    try {
+      await redisClient.setEx(
+        cacheKey,
+        DISRUPTION_CACHE_TTL_SECONDS,
+        JSON.stringify(result),
+      );
+    } catch (error) {
+      console.error(`Redis cache write failed for ${cacheKey}:`, error);
+    }
+  }
+
+  return result;
+};
+
+const sendAiResult = async (res, methodName) => {
+  const result = await getCachedAiResult(methodName);
   return res.status(200).json(result);
 };
 
