@@ -1,10 +1,7 @@
 export async function fetchChokepointWeather() {
   const hubs = [
     { name: "Suez Canal", lat: 29.97, lon: 32.53 },
-    { name: "Panama Canal", lat: 9.08, lon: -79.69 },
-    { name: "Port of Singapore", lat: 1.29, lon: 103.85 },
-    { name: "Port of Rotterdam", lat: 51.92, lon: 4.48 },
-    { name: "Port of Shanghai", lat: 31.23, lon: 121.47 }
+    { name: "Panama Canal", lat: 9.08, lon: -79.69 }
   ];
 
   const weatherResults = [];
@@ -37,7 +34,7 @@ export async function fetchChokepointWeather() {
 }
 
 export async function fetchNasaEonetEvents() {
-  const url = "https://eonet.gsfc.nasa.gov/api/v3/events?status=open&limit=10";
+  const url = "https://eonet.gsfc.nasa.gov/api/v3/events?status=open&limit=3";
   try {
     const res = await fetch(url);
     if (!res.ok) {

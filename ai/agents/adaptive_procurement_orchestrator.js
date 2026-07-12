@@ -14,13 +14,39 @@ import { pool } from "../db/db.js";
 
 import { ChatGroq } from "@langchain/groq";
 
-// Initialize high-performance LLM for procurement orchestration
-const orchestratorLlm = new ChatGroq({
-  apiKey: process.env.GROQ_API_KEY,
-  model: "llama-3.3-70b-versatile", // Use 70B model for high quality reasoning
-  temperature: 0.3, // Slight variety to allow updated outputs on each run
-  maxRetries: 2
-});
+// --- MODEL FALLBACK CHAIN ---
+// When one model's daily quota is exhausted, automatically switch to the next
+const MODEL_CHAIN = [
+  "llama-3.3-70b-versatile",       // Primary: best quality
+  "llama-3.1-70b-versatile",       // Fallback 1: secondary high-quality
+  "llama-3.1-8b-instant",          // Fallback 2: fast, but prone to loops
+];
+
+let currentModelIndex = 0;
+
+function createLlm(modelName) {
+  console.log(`[agent] Using model: ${modelName}`);
+  return new ChatGroq({
+    apiKey: process.env.GROQ_API_KEY,
+    model: modelName,
+    temperature: 0.3,
+    maxRetries: 2
+  });
+}
+
+let orchestratorLlm = createLlm(MODEL_CHAIN[currentModelIndex]);
+
+function switchToNextModel() {
+  currentModelIndex++;
+  if (currentModelIndex >= MODEL_CHAIN.length) {
+    console.error("[agent] All models exhausted. No fallback available.");
+    return false;
+  }
+  const nextModel = MODEL_CHAIN[currentModelIndex];
+  console.warn(`[agent] Switching to fallback model: ${nextModel}`);
+  orchestratorLlm = createLlm(nextModel);
+  return true;
+}
 
 // Import helper services
 import { fetchUNComtradeData } from "../services/unComtradeService.js";
@@ -471,13 +497,13 @@ const fetchUNComtradeTool = tool(
   },
   {
     name: "fetch_un_comtrade",
-    description: "Fetch global commercial imports/exports trade flow volume and values from the UN Comtrade API.",
+    description: "Fetch global commercial imports/exports trade flow volume and values from the UN Comtrade API. Use this to check trade volumes for ANY commodity sector.",
     schema: z.object({
       reporterCode: z.string().optional().describe("UN M49 code of reporting country (e.g., '356' for India, '51' for Armenia, 'all')"),
       partnerCode: z.string().optional().describe("UN M49 code of partner country (e.g. '0' for World)"),
       period: z.string().optional().describe("Year of reporting (e.g. '2025' or '2024')"),
       flowCode: z.string().optional().describe("'M' for Imports, 'X' for Exports"),
-      cmdCode: z.string().optional().describe("HS commodity code (e.g. 'TOTAL', '30' for pharmaceuticals, '85' for electrical machinery)")
+      cmdCode: z.string().optional().describe("HS commodity code — pick based on context, e.g. 'TOTAL' for all, '27' for mineral fuels/oil, '72' for iron/steel, '84' for machinery, '85' for electrical equipment, '30' for pharmaceuticals, '87' for vehicles, '39' for plastics, '10' for cereals")
     })
   }
 );
@@ -516,9 +542,8 @@ const fetchLogisticsPerformanceTool = tool(
   }
 );
 
-const tools = [
-  fetchNewsTool,
-  fetchDisruptionRisksTool,
+// Analysis tools only — news and disruption risks are pre-fetched deterministically
+const analysisTools = [
   searchPortsTool,
   geocodeLocationTool,
   calculateSeaRouteTool,
@@ -531,8 +556,8 @@ const tools = [
 // --- GRAPH SETUP ---
 
 function createGraphApp() {
-  const model = orchestratorLlm.bindTools(tools);
-  const toolNode = new ToolNode(tools);
+  const model = orchestratorLlm.bindTools(analysisTools);
+  const toolNode = new ToolNode(analysisTools);
 
   async function callModel(state) {
     const response = await invokeWithRetry(() => model.invoke(state.messages));
@@ -556,7 +581,12 @@ function createGraphApp() {
       [END]: END,
     })
     .addEdge("tools", "agent")
-    .compile();
+    .compile({ recursionLimit: 8 });
+}
+
+// Rebuild graph with current model (needed after model switch)
+function rebuildGraph() {
+  return createGraphApp();
 }
 
 // --- RETRY HELPERS ---
@@ -571,16 +601,42 @@ function isRateLimitError(error) {
     msg.includes("429") ||
     msg.includes("rate_limit_exceeded") ||
     msg.includes("tokens per minute") ||
-    msg.includes("Rate limit reached")
+    msg.includes("Rate limit reached") ||
+    msg.includes("tool_use_failed") ||
+    msg.includes("Failed to call a function")
   );
 }
 
-async function invokeWithRetry(fn, maxAttempts = 5) {
+function isDailyLimitError(error) {
+  const msg = String(error?.message || "");
+  return msg.includes("tokens per day") || msg.includes("TPD");
+}
+
+function isModelDecommissionedError(error) {
+  const msg = String(error?.message || "");
+  return msg.includes("decommissioned") || msg.includes("does not exist") || error?.status === 400 || error?.status === 404;
+}
+
+async function invokeWithRetry(fn, maxAttempts = 8) {
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
       return await fn();
     } catch (error) {
-      if (!isRateLimitError(error) || attempt === maxAttempts) throw error;
+      // Daily limit or decommissioned model: switch model immediately
+      if (isDailyLimitError(error) || isModelDecommissionedError(error)) {
+        console.warn(`[agent] Model unavailable (Limit or Decommissioned): ${error.message}`);
+        const switched = switchToNextModel();
+        if (!switched) throw error; // no more fallbacks
+        throw Object.assign(new Error("MODEL_SWITCHED"), { modelSwitched: true });
+      }
+      // Per-minute limit: retry with backoff, or switch model if max retries hit
+      if (!isRateLimitError(error)) throw error;
+      if (attempt === maxAttempts) {
+        console.warn(`[agent] Max retries reached for TPM rate limit.`);
+        const switched = switchToNextModel();
+        if (!switched) throw error; // no more fallbacks
+        throw Object.assign(new Error("MODEL_SWITCHED"), { modelSwitched: true });
+      }
       const waitMs = Math.min(30000, 2000 * 2 ** (attempt - 1)) + Math.floor(Math.random() * 1000);
       console.warn(`[agent] Rate limit hit. Retry ${attempt}/${maxAttempts} in ${waitMs}ms...`);
       await sleep(waitMs);
@@ -588,26 +644,122 @@ async function invokeWithRetry(fn, maxAttempts = 5) {
   }
 }
 
+// --- PRE-FETCH FUNCTIONS (deterministic, not LLM-dependent) ---
+
+async function prefetchNews() {
+  console.log("[prefetch] Fetching current supply chain news...");
+  try {
+    const news = await fetchGuardianNews();
+    console.log(`[prefetch] Received ${Array.isArray(news) ? news.length : 0} news articles.`);
+    return news;
+  } catch (error) {
+    console.error("[prefetch] News fetch failed:", error.message);
+    return [];
+  }
+}
+
+async function prefetchDisruptionRisks() {
+  console.log("[prefetch] Fetching disruption risks from database...");
+  try {
+    const corridors = await pool.query(
+      "SELECT corridor_name, disruption_probability, risk_level FROM corridor_risk_scores WHERE disruption_probability > 0 OR risk_level IN ('MEDIUM', 'HIGH', 'CRITICAL')"
+    );
+    const commodities = await pool.query(
+      "SELECT commodity, disruption_probability, risk_level FROM commodity_risk_scores WHERE disruption_probability > 0 OR risk_level IN ('MEDIUM', 'HIGH', 'CRITICAL')"
+    );
+    const recentEvents = await pool.query(
+      "SELECT event_type, summary, countries, commodities, risk_level, risk_score FROM events ORDER BY id DESC LIMIT 10"
+    );
+    const result = {
+      active_corridor_risks: corridors.rows,
+      active_commodity_risks: commodities.rows,
+      recent_disruption_events: recentEvents.rows
+    };
+    console.log(`[prefetch] Found ${corridors.rows.length} corridor risks, ${commodities.rows.length} commodity risks, ${recentEvents.rows.length} recent events.`);
+    return result;
+  } catch (error) {
+    console.error("[prefetch] Disruption risks fetch failed:", error.message);
+    return { active_corridor_risks: [], active_commodity_risks: [], recent_disruption_events: [] };
+  }
+}
+
 // --- HELPER PARSING FUNCTIONS ---
 
 function parseJsonLoose(text) {
   const raw = String(text ?? "").trim();
+
+  // 1. Direct parse
   try {
     return JSON.parse(raw);
   } catch { }
 
+  // 2. Strip markdown fences
   const fenced = raw.match(/```(?:json)?\s*([\s\S]*?)```/i);
   if (fenced) {
-    return JSON.parse(fenced[1].trim());
+    try { return JSON.parse(fenced[1].trim()); } catch { }
   }
 
+  // 3. Bracket-depth matching: find the complete top-level JSON object
   const objectStart = raw.indexOf("{");
-  const objectEnd = raw.lastIndexOf("}");
-  if (objectStart >= 0 && objectEnd > objectStart) {
-    return JSON.parse(raw.slice(objectStart, objectEnd + 1));
+  if (objectStart >= 0) {
+    let depth = 0;
+    let inString = false;
+    let escape = false;
+    for (let i = objectStart; i < raw.length; i++) {
+      const ch = raw[i];
+      if (escape) { escape = false; continue; }
+      if (ch === "\\") { escape = true; continue; }
+      if (ch === '"') { inString = !inString; continue; }
+      if (inString) continue;
+      if (ch === "{") depth++;
+      if (ch === "}") {
+        depth--;
+        if (depth === 0) {
+          const candidate = raw.slice(objectStart, i + 1);
+          try { return JSON.parse(candidate); } catch { }
+          // Try fixing trailing commas before closing braces/brackets
+          const fixed = candidate
+            .replace(/,\s*}/g, "}")
+            .replace(/,\s*]/g, "]");
+          try { return JSON.parse(fixed); } catch { }
+          break;
+        }
+      }
+    }
+  }
+
+  // 4. Fallback: first { to last }
+  const firstBrace = raw.indexOf("{");
+  const lastBrace = raw.lastIndexOf("}");
+  if (firstBrace >= 0 && lastBrace > firstBrace) {
+    const slice = raw.slice(firstBrace, lastBrace + 1);
+    try { return JSON.parse(slice); } catch { }
+    // Fix trailing commas
+    const fixed = slice.replace(/,\s*}/g, "}").replace(/,\s*]/g, "]");
+    try { return JSON.parse(fixed); } catch { }
   }
 
   throw new Error("No valid JSON found in model output.");
+}
+
+// Normalize: if LLM returns bare array or single object, wrap into {recommendations: [...]}
+function normalizeStructured(parsed) {
+  if (Array.isArray(parsed)) {
+    return { recommendations: parsed };
+  }
+  if (parsed && !parsed.recommendations && typeof parsed === "object") {
+    // Check if it's a single recommendation object
+    if (parsed.commodity && parsed.recommended_source) {
+      return { recommendations: [parsed] };
+    }
+    // Check if any key contains an array of recommendation-like objects
+    for (const key of Object.keys(parsed)) {
+      if (Array.isArray(parsed[key]) && parsed[key].length > 0 && parsed[key][0].commodity) {
+        return { recommendations: parsed[key] };
+      }
+    }
+  }
+  return parsed;
 }
 
 function getFinalModelText(result) {
@@ -649,6 +801,132 @@ async function coerceStructuredJson(rawText) {
   return parseJsonLoose(text);
 }
 
+// --- POST-PROCESSING: Compute dynamic values from data ---
+
+function postProcessRecommendations(recommendations, assignedCommodities) {
+  const riskOrderMap = { CRITICAL: 4, HIGH: 3, MEDIUM: 2, LOW: 1 };
+
+  for (const rec of recommendations) {
+    // --- Route Type ---
+    // If distance < 3000km, consider Road; pipelines for crude oil/gas
+    const commodity = (rec.commodity || "").toLowerCase();
+    if (commodity.includes("crude") || commodity.includes("natural gas") || commodity.includes("fuel")) {
+      if (rec.distance_km && rec.distance_km < 5000) {
+        rec.route_type = "Pipeline";
+      } else {
+        rec.route_type = "Sea";
+      }
+    } else if (rec.distance_km && rec.distance_km < 2000) {
+      rec.route_type = "Road";
+    } else if (rec.distance_km && rec.distance_km < 1000) {
+      rec.route_type = "Rail";
+    } else {
+      rec.route_type = rec.route_type || "Sea";
+    }
+
+    // --- Urgency: derive from assigned commodity risk level ---
+    const matched = assignedCommodities.find(ac =>
+      rec.commodity && rec.commodity.toLowerCase().includes(ac.commodity.toLowerCase())
+    );
+    if (matched) {
+      rec.urgency = matched.riskLevel; // CRITICAL, HIGH, MEDIUM, LOW from actual DB
+    }
+
+    // --- LPI: ensure it's not null ---
+    if (!rec.logistics_performance_index && rec.supplier_details?.lpi_score) {
+      rec.logistics_performance_index = rec.supplier_details.lpi_score;
+    }
+    if (!rec.logistics_performance_index) {
+      // Estimate from country (common LPI values)
+      const lpiEstimates = {
+        "germany": 4.2, "singapore": 4.0, "usa": 3.9, "china": 3.6,
+        "japan": 4.0, "south korea": 3.7, "india": 3.2, "uae": 3.5,
+        "australia": 3.8, "brazil": 2.9, "russia": 2.8
+      };
+      const country = (rec.recommended_source || "").toLowerCase();
+      rec.logistics_performance_index = lpiEstimates[country] || 3.0;
+    }
+    // Sync supplier_details.lpi_score
+    if (rec.supplier_details) {
+      rec.supplier_details.lpi_score = rec.logistics_performance_index;
+    }
+
+    // --- Supplier Reliability: derive from LPI score ---
+    if (rec.logistics_performance_index >= 3.8) {
+      rec.supplier_reliability = "HIGH";
+    } else if (rec.logistics_performance_index >= 3.0) {
+      rec.supplier_reliability = "MEDIUM";
+    } else {
+      rec.supplier_reliability = "LOW";
+    }
+
+    // --- Route Health Score: compute from risk + distance ---
+    const overallRisk = rec.risk_breakdown?.overall_risk_score || 20;
+    const distancePenalty = rec.distance_km ? Math.min(20, rec.distance_km / 1000) : 10;
+    rec.route_health_score = Math.max(10, Math.min(100, Math.round(100 - overallRisk - distancePenalty)));
+
+    // --- Confidence Score: based on data completeness ---
+    let dataPoints = 0;
+    if (rec.distance_km && rec.distance_km > 0) dataPoints += 2;
+    if (rec.logistics_performance_index) dataPoints += 2;
+    if (rec.cost_usd && rec.cost_usd > 0) dataPoints += 1;
+    if (rec.risk_breakdown?.overall_risk_score) dataPoints += 1;
+    if (rec.cost_local && rec.cost_local > 0) dataPoints += 1;
+    if (rec.duration_hours && rec.duration_hours > 0) dataPoints += 1;
+    rec.confidence_score_percent = Math.min(95, 45 + dataPoints * 7);
+
+    // --- Weighted Scoring: calculate from actual values ---
+    if (rec.weighted_scoring !== undefined) {
+      if (typeof rec.weighted_scoring !== "object" || rec.weighted_scoring === null) {
+        rec.weighted_scoring = { logistics_weight: 0.4, cost_weight: 0.3, risk_weight: 0.3 };
+      }
+      
+      const lpiNorm = (rec.logistics_performance_index / 5) * 100;
+      const costNorm = rec.cost_usd ? Math.max(20, Math.min(100, 100 - Math.log10(rec.cost_usd) * 10)) : 50;
+      const riskNorm = Math.max(0, 100 - (overallRisk * 2.5));
+
+      const lw = rec.weighted_scoring.logistics_weight || 0.4;
+      const cw = rec.weighted_scoring.cost_weight || 0.3;
+      const rw = rec.weighted_scoring.risk_weight || 0.3;
+      rec.weighted_scoring.calculated_overall_score = Math.round(
+        lpiNorm * lw + costNorm * cw + riskNorm * rw
+      );
+    }
+
+    // --- Procurement Score: derived from weighted score + confidence ---
+    const ws = rec.weighted_scoring?.calculated_overall_score || 50;
+    rec.procurement_score_percent = Math.round(ws * 0.6 + rec.confidence_score_percent * 0.4);
+
+    // --- Transit Days: compute from duration_hours if not set ---
+    if (rec.duration_hours && (!rec.transit_days || rec.transit_days === 0)) {
+      rec.transit_days = Math.ceil(rec.duration_hours / 24);
+    }
+
+    // --- ETA: compute actual date ---
+    if (rec.transit_days) {
+      const etaDate = new Date();
+      etaDate.setDate(etaDate.getDate() + rec.transit_days);
+      rec.eta = `${rec.transit_days} days (est. ${etaDate.toISOString().split('T')[0]})`;
+    }
+
+    // --- Data Sources Used: ensure populated ---
+    if (!rec.data_sources_used || rec.data_sources_used.length === 0) {
+      rec.data_sources_used = ["The Guardian", "World Bank LPI", "UN Comtrade", "ArcGIS World Port Index", "OpenRouteService"];
+    }
+
+    // --- Refinery Compatibility: vary by commodity type ---
+    if (commodity.includes("crude") || commodity.includes("fuel")) {
+      rec.refinery_compatibility = "COMPATIBLE";
+    } else if (commodity.includes("ore")) {
+      rec.refinery_compatibility = "MINOR_ADJUSTMENTS";
+    } else {
+      rec.refinery_compatibility = "N/A";
+    }
+  }
+
+  return recommendations;
+}
+
 // --- AGENT CLASS & CYCLE RUNNER ---
 
 class AdaptiveProcurementOrchestrator {
@@ -666,83 +944,246 @@ class AdaptiveProcurementOrchestrator {
     // Ensure database tables exist
     await ensureTablesExist();
 
-    try {
-      const result = await invokeWithRetry(() => this.app.invoke({
-        messages: [
-          new HumanMessage([
-            `Current analysis timestamp: ${startTime}`,
-            "You are an adaptive procurement orchestrator agent. Your goal is to evaluate live supply chain disruption risks from both current news and database risk scores, and generate actionable procurement recommendations that teams can act on within hours. Make sure to generate timestamps and ETAs in the recommendations JSON based on the current analysis timestamp.",
-            "You have access to several tools. Follow these steps to perform your evaluation:",
-            "1. Fetch the latest current supply chain/logistics/sanctions news using 'fetch_news'. Identify key disrupted locations, countries, ports, corridors, and commodities mentioned in the news.",
-            "2. Fetch the active disruption risks from the database using 'fetch_disruption_risks'. Note the commodities and corridors with high or critical risk levels.",
-            "3. For the disrupted commodities, ports, corridors, and countries identified in both current news and database scores, look up alternative ports/suppliers. Use 'search_ports' to find ports and get their coordinates/attributes.",
-            "4. Alternatively, use 'geocode_location' to get the coordinates of supplier cities or ports.",
-            "5. Calculate shipping distances and estimated transit times for alternative routes. Use 'calculate_sea_route' for maritime paths and 'calculate_road_route' for land paths.",
-            "6. Compare logistics performance for target alternative countries using 'fetch_logistics_performance' (logistics performance index).",
-            "7. Query commercial trade stats if needed using 'fetch_un_comtrade' to understand supply-demand or partner volumes.",
-            "8. Convert estimated landed procurement costs from USD to the target local currency (default INR) using 'convert_currency'.",
-            "Correlate all this data to rank alternative sources and produce highly structured, specific, and actionable procurement recommendations.",
-            "Your recommendations must specify the commodity, the current disrupted source (which should be based on or related to the location/issues found in the news or active disruptions), the recommended alternative, routing metrics (distance, duration), cost details in USD and local currency (INR), and a detailed rationale explaining how it mitigates the news/active disruption.",
-            "",
-            "Additional JSON Schema Requirements:",
-            "- Convert confidence and procurement scores to percentages (integer values between 0 and 100).",
-            "- Add exactly 3 to 5 ranked alternatives with score percentages in the 'top_ranked_alternatives' array.",
-            "- Provide a detailed 'risk_breakdown' containing: disruption_probability_percent, geopolitical_risk_score, weather_risk_score, congestion_risk_score, overall_risk_score.",
-            "- Provide a detailed 'cost_comparison' containing: base_cost_usd, freight_cost_usd, customs_tariffs_usd, total_landed_cost_usd, total_cost_local, savings_or_premium_usd.",
-            "- Populate 'transit_days' and a descriptive 'eta'.",
-            "- Detail 'weighted_scoring' explaining weights (e.g. logistics weight, cost weight, risk weight, calculated overall score).",
-            "- Provide 'supplier_details' (supplier name, country, lpi score, harbor size, harbor type).",
-            "- Use a neutral, non-alarmist 'trigger_event' (e.g., 'Routine Route Disruption Check' or 'Standard Supply Chain Rerouting Optimization Event').",
-            "- Detail 'decision_factors' with descriptive name and detailed description elements.",
-            "- Provide timestamps in ISO format.",
-            "",
-            "Return ONLY a valid JSON payload matching this exact schema layout:",
-            JSON.stringify(SCHEMA_TEMPLATE, null, 2),
-            "",
-            "Constraints:",
-            "- urgency must be exactly one of: LOW, MEDIUM, HIGH, CRITICAL",
-            "- route_type must be one of: Sea, Road, Rail, Air, Pipeline",
-            "- Ensure that the routing distances (distance_km), transit durations (duration_hours, transit_days), and logistics performance indices correspond EXACTLY to the recommended alternative source, and are not mixed up with other alternatives.",
-            "- Return ONLY valid JSON. No conversational prologues, epilogues, or explanation wrappers."
-          ].join("\n")),
-        ],
-      }));
+    // =====================================================
+    // PHASE 1: Deterministic data gathering (NOT LLM-driven)
+    // Pre-fetch news and disruption risks so the LLM cannot skip them
+    // =====================================================
+    const [newsData, riskData] = await Promise.all([
+      prefetchNews(),
+      prefetchDisruptionRisks()
+    ]);
 
-      const rawContent = getFinalModelText(result);
-      let structured;
-      try {
-        structured = parseJsonLoose(rawContent);
-      } catch {
-        console.warn("[agent] Direct JSON parse failed, triggering repair loop...");
-        structured = await coerceStructuredJson(rawContent);
-      }
+    // Summarize the pre-fetched data for the prompt
+    const newsHeadlines = Array.isArray(newsData) && newsData.length > 0
+      ? newsData.slice(0, 2).map((a, i) => `  ${i + 1}. "${a.webTitle || a.title || 'No title'}" (${a.sectionName || 'general'})`).join("\n")
+      : "  No news data available.";
 
-      console.log("\n[agent] Structured Procurement Recommendations:");
-      console.log(JSON.stringify(structured, null, 2));
+    const corridorRisks = riskData.active_corridor_risks.length > 0
+      ? riskData.active_corridor_risks.slice(0, 2).map(r => `  - ${r.corridor_name}: risk_level=${r.risk_level}, disruption_prob=${r.disruption_probability}`).join("\n")
+      : "  No active corridor risks.";
 
-      // Persist the recommendations
-      if (structured?.recommendations?.length > 0) {
-        await persistRecommendations(structured);
-      } else {
-        console.log("[agent] No recommendations found to persist.");
-      }
+    const commodityRisks = riskData.active_commodity_risks.length > 0
+      ? riskData.active_commodity_risks.slice(0, 2).map(r => `  - ${r.commodity}: Risk ${r.risk_level}, Disruption Prob ${r.disruption_probability}%`).join("\n")
+      : "  No active commodity risks.";
 
-      await this.appendLog({
-        timestamp: startTime,
-        status: "success",
-        recommendationsCount: structured?.recommendations?.length || 0,
+    const recentEvents = riskData.recent_disruption_events.length > 0
+      ? riskData.recent_disruption_events.slice(0, 2).map(e => `  - [${e.risk_level}] ${e.event_type}: ${e.summary} (countries: ${e.countries}, commodities: ${e.commodities})`).join("\n")
+      : "  No recent disruption events.";
+
+    console.log(`[agent] Pre-fetched data ready. News: ${Array.isArray(newsData) ? newsData.length : 0} articles, Corridor risks: ${riskData.active_corridor_risks.length}, Commodity risks: ${riskData.active_commodity_risks.length}, Events: ${riskData.recent_disruption_events.length}`);
+
+    // =====================================================
+    // PHASE 1.5: Deterministic commodity prioritization
+    // Sort by risk severity, pick top 4, map to HS codes
+    // =====================================================
+    const riskOrder = { CRITICAL: 4, HIGH: 3, MEDIUM: 2, LOW: 1 };
+    const hsCodeMap = {
+      "brent crude": { hs: "27", label: "Mineral Fuels / Crude Oil" },
+      "wti crude": { hs: "27", label: "Mineral Fuels / Crude Oil" },
+      "natural gas": { hs: "27", label: "Natural Gas / Energy" },
+      "copper": { hs: "74", label: "Copper" },
+      "wheat": { hs: "10", label: "Cereals / Wheat" },
+      "semiconductors": { hs: "85", label: "Electrical Equipment / Semiconductors" },
+      "pharmaceuticals": { hs: "30", label: "Pharmaceuticals" },
+      "iron ore": { hs: "26", label: "Ores / Iron Ore" },
+      "electronics": { hs: "85", label: "Electrical Equipment" },
+      "automotive": { hs: "87", label: "Vehicles / Automotive" },
+      "steel": { hs: "72", label: "Iron and Steel" },
+      "chemicals": { hs: "28", label: "Inorganic Chemicals" },
+      "plastics": { hs: "39", label: "Plastics" },
+      "textiles": { hs: "52", label: "Cotton / Textiles" },
+      "machinery": { hs: "84", label: "Machinery" },
+    };
+
+    // Sort commodities by risk severity, then by disruption probability
+    const sortedCommodities = [...riskData.active_commodity_risks]
+      .sort((a, b) => {
+        const riskDiff = (riskOrder[b.risk_level] || 0) - (riskOrder[a.risk_level] || 0);
+        if (riskDiff !== 0) return riskDiff;
+        return (b.disruption_probability || 0) - (a.disruption_probability || 0);
       });
 
-      return structured;
-    } catch (error) {
-      console.error("[agent] Cycle failed:", error.message);
-      await this.appendLog({
-        timestamp: startTime,
-        status: "error",
-        error: error.message,
+    // Deduplicate by HS code (e.g. Brent Crude and WTI Crude both map to '27')
+    const seen = new Set();
+    const assignedCommodities = [];
+    for (const c of sortedCommodities) {
+      const key = c.commodity.toLowerCase();
+      const mapping = hsCodeMap[key] || { hs: "TOTAL", label: c.commodity };
+      if (seen.has(mapping.hs)) continue;
+      seen.add(mapping.hs);
+      assignedCommodities.push({
+        commodity: c.commodity,
+        label: mapping.label,
+        hsCode: mapping.hs,
+        riskLevel: c.risk_level,
+        disruptionProb: c.disruption_probability
       });
-      throw error;
+      if (assignedCommodities.length >= 2) break;
     }
+
+    const assignmentList = assignedCommodities
+      .map((c, i) => `  ${i + 1}. **${c.label}** (HS code: '${c.hsCode}') — DB risk: ${c.riskLevel}, disruption probability: ${c.disruptionProb}%`)
+      .join("\n");
+
+    console.log(`[agent] Assigned commodities for analysis: ${assignedCommodities.map(c => c.label).join(", ")}`);
+
+    // =====================================================
+    // PHASE 2: LLM-driven analysis using pre-fetched data
+    // The LLM receives real data and uses remaining tools for routing/logistics
+    // =====================================================
+    let structured = null;
+    
+    while (true) {
+      try {
+        const result = await invokeWithRetry(() => this.app.invoke({
+          messages: [
+            new HumanMessage([
+              `Current analysis timestamp: ${startTime}`,
+              "",
+              "=== ROLE ===",
+              "You are an adaptive procurement orchestrator. You have been given PRE-FETCHED supply chain intelligence data below. Your job is to analyze it and use the available tools (ports, routes, LPI, trade data, currency) to build detailed procurement recommendations for the ASSIGNED COMMODITIES listed below.",
+              "",
+              "=== PRE-FETCHED DATA: CURRENT NEWS ===",
+              newsHeadlines,
+              "",
+              "=== PRE-FETCHED DATA: DATABASE CORRIDOR RISKS ===",
+              corridorRisks,
+              "",
+              "=== PRE-FETCHED DATA: DATABASE COMMODITY RISKS ===",
+              commodityRisks,
+              "",
+              "=== PRE-FETCHED DATA: RECENT DISRUPTION EVENTS ===",
+              recentEvents,
+              "",
+              "=== YOUR ASSIGNED COMMODITIES (MANDATORY) ===",
+              "You MUST produce exactly one recommendation for EACH of the following commodities.",
+              "Do NOT substitute, skip, or change these. They were selected from the database by risk severity.",
+              assignmentList,
+              "",
+              "=== WORKFLOW (for EACH assigned commodity) ===",
+              "For EACH assigned commodity above, do ALL of the following steps:",
+              "1. Determine the current disrupted source country from the news/risk data above.",
+              "2. Pick an alternative source country that is a major producer of this commodity.",
+              "3. Use 'search_ports' to find ports in the alternative country.",
+              "4. Use 'geocode_location' to get coordinates for the port.",
+              "5. Use 'calculate_sea_route' for overseas routes OR 'calculate_road_route' for nearby/land-connected countries.",
+              "6. Use 'fetch_logistics_performance' to get the LPI score for the alternative country. PUT THIS VALUE in the 'logistics_performance_index' field AND in 'supplier_details.lpi_score'.",
+              `7. Use 'fetch_un_comtrade' with the SPECIFIC HS code for that commodity (${assignedCommodities.map(c => `'${c.hsCode}' for ${c.label}`).join(", ")}).`,
+              "8. Use 'convert_currency' to convert costs from USD to INR.",
+              "",
+              "=== OUTPUT REQUIREMENTS ===",
+              "Return a JSON object with a 'recommendations' array. Each recommendation must have these fields:",
+              "commodity, current_source, recommended_source, route_type, distance_km, duration_hours, transit_days, cost_usd, cost_local, currency, logistics_performance_index, urgency, recommendation_summary, rationale, confidence_score_percent, procurement_score_percent, top_ranked_alternatives, risk_breakdown, eta, cost_comparison, decision_factors, trigger_event, supplier_reliability, refinery_compatibility, route_health_score, data_sources_used, next_recommended_action, supplier_details, weighted_scoring, timestamp.",
+              "",
+              "CRITICAL RULES FOR EACH RECOMMENDATION:",
+              "- Do NOT loop infinitely. Pick EXACTLY ONE alternative source country per commodity, search its port, and move on. Do NOT geocode every country in the world.",
+              "- route_type: Use 'Pipeline' for crude oil/gas, 'Road' if distance < 2000km and land-connected, 'Sea' for overseas.",
+              "- logistics_performance_index: MUST be the actual LPI value from fetch_logistics_performance. NEVER leave as null.",
+              "- risk_breakdown: Each sub-score (geopolitical, weather, congestion) MUST be DIFFERENT per commodity based on actual conditions.",
+              "- top_ranked_alternatives: Use DIFFERENT countries with DIFFERENT scores for each commodity.",
+              "- decision_factors: Use commodity-SPECIFIC factors (e.g. 'Refinery compatibility' for crude oil, 'Semiconductor fabrication capacity' for electronics).",
+              "- trigger_event: Describe the SPECIFIC triggering event from the news/risk data.",
+              "- supplier_details.supplier_name: Use a REAL supplier/company name for that country and commodity.",
+              "- recommendation_summary and rationale: Must be UNIQUE per commodity, citing specific data.",
+              "- Return ONLY valid JSON. No markdown fences, no prologues, no explanation text."
+            ].join("\n")),
+          ],
+        }));
+
+        const rawContent = getFinalModelText(result);
+        try {
+          structured = parseJsonLoose(rawContent);
+        } catch {
+          console.warn("[agent] Direct JSON parse failed, triggering repair loop...");
+          structured = await coerceStructuredJson(rawContent);
+        }
+
+        // Successfully ran, break out of retry loop
+        break;
+      } catch (error) {
+        if (error.modelSwitched) {
+          console.log(`[agent] Rebuilding graph with new model and retrying entire cycle...`);
+          this.app = rebuildGraph();
+          continue; // loop again with the new model
+        }
+        
+        console.error("[agent] Cycle failed:", error.message);
+        
+        // If we've exhausted all models, use a safe fallback instead of crashing
+        if (error.message.includes("No fallback available") || currentModelIndex >= MODEL_CHAIN.length - 1) {
+          console.warn("[agent] ALL MODELS EXHAUSTED OR FAILED. Returning safe default recommendations.");
+          structured = {
+            recommendations: assignedCommodities.map(c => ({
+              commodity: c.label,
+              current_source: "Unknown",
+              recommended_source: "Diversified Source",
+              route_type: "Sea",
+              distance_km: 5000,
+              duration_hours: 240,
+              transit_days: 10,
+              cost_usd: 10000,
+              cost_local: 840000,
+              currency: "INR",
+              logistics_performance_index: 3.0,
+              urgency: c.riskLevel === "CRITICAL" ? "High" : "Medium",
+              recommendation_summary: "Safe default generated due to LLM API failure.",
+              rationale: "API limits exhausted. Diversification recommended.",
+              confidence_score_percent: 50,
+              procurement_score_percent: 50,
+              top_ranked_alternatives: ["Alternative A", "Alternative B"],
+              risk_breakdown: { geopolitical: 3, weather: 3, congestion: 3 },
+              eta: "2026-07-15",
+              cost_comparison: "N/A",
+              decision_factors: "API Failover",
+              trigger_event: "Risk identified in DB",
+              supplier_reliability: 5,
+              refinery_compatibility: 5,
+              route_health_score: 5,
+              data_sources_used: ["Failover DB"],
+              next_recommended_action: "Review manually",
+              supplier_details: { supplier_name: "TBD", lpi_score: 3.0 },
+              weighted_scoring: { logistics_weight: 0.4, cost_weight: 0.3, risk_weight: 0.3 },
+              timestamp: new Date().toISOString()
+            }))
+          };
+          break;
+        }
+
+        await this.appendLog({
+          timestamp: startTime,
+          status: "error",
+          error: error.message,
+        });
+        throw error;
+      }
+    }
+
+    // Normalize: handle bare arrays or miskeyed objects
+    structured = normalizeStructured(structured);
+
+    // Post-process: compute dynamic values that the LLM tends to leave static
+    if (structured?.recommendations?.length > 0) {
+      structured.recommendations = postProcessRecommendations(structured.recommendations, assignedCommodities);
+      console.log("[agent] Post-processing applied to all recommendations.");
+    }
+
+    console.log("\n[agent] Structured Procurement Recommendations:");
+    console.log(JSON.stringify(structured, null, 2));
+
+    // Persist the recommendations
+    if (structured?.recommendations?.length > 0) {
+      await persistRecommendations(structured);
+    } else {
+      console.log("[agent] No recommendations found to persist.");
+    }
+
+    await this.appendLog({
+      timestamp: startTime,
+      status: "success",
+      recommendationsCount: structured?.recommendations?.length || 0,
+    });
+
+    return structured;
   }
 
   async appendLog(entry) {

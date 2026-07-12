@@ -1,0 +1,477 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Strategic Reserve Optimisation Dashboard</title>
+  
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  
+  <!-- Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <style>
+    :root {
+      --bg-dark: #0f172a;
+      --bg-panel: rgba(30, 41, 59, 0.7);
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --accent-blue: #38bdf8;
+      --accent-green: #10b981;
+      --accent-red: #ef4444;
+      --accent-orange: #f59e0b;
+      --accent-purple: #a855f7;
+      --border-color: rgba(255, 255, 255, 0.1);
+      --glass-blur: blur(16px);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Outfit', sans-serif;
+      background: var(--bg-dark);
+      background-image: 
+        radial-gradient(circle at 15% 50%, rgba(56, 189, 248, 0.05) 0%, transparent 50%),
+        radial-gradient(circle at 85% 30%, rgba(168, 85, 247, 0.05) 0%, transparent 50%);
+      color: var(--text-main);
+      min-height: 100vh;
+      overflow-x: hidden;
+      padding-bottom: 50px;
+    }
+
+    .glass-panel {
+      background: var(--bg-panel);
+      backdrop-filter: var(--glass-blur);
+      -webkit-backdrop-filter: var(--glass-blur);
+      border: 1px solid var(--border-color);
+      border-radius: 16px;
+      padding: 24px;
+      transition: transform 0.3s ease, box-shadow 0.3s ease;
+    }
+    .glass-panel:hover {
+      transform: translateY(-5px);
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+    }
+
+    header {
+      padding: 24px 48px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid var(--border-color);
+      background: rgba(15, 23, 42, 0.8);
+      backdrop-filter: var(--glass-blur);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    header h1 { font-weight: 600; font-size: 24px; display: flex; align-items: center; gap: 12px; }
+    header h1 i { color: var(--accent-blue); }
+
+    .status-badge {
+      padding: 8px 16px; border-radius: 999px; font-size: 14px; font-weight: 500; display: flex; align-items: center; gap: 8px;
+    }
+    .status-safe { background: rgba(16, 185, 129, 0.2); color: var(--accent-green); border: 1px solid var(--accent-green); }
+
+    .dashboard-container { padding: 32px 48px; display: grid; grid-template-columns: repeat(12, 1fr); gap: 24px; }
+
+    /* Hero Decision Panel */
+    .decision-panel {
+      grid-column: span 12;
+      background: linear-gradient(135deg, rgba(56, 189, 248, 0.1), rgba(168, 85, 247, 0.1));
+      border: 1px solid var(--accent-blue);
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .decision-info h2 { font-size: 28px; margin-bottom: 8px; color: var(--accent-blue); }
+    .decision-info p { color: var(--text-muted); font-size: 16px; max-width: 600px; line-height: 1.5; margin-bottom: 12px; }
+    .confidence-badge { display: inline-block; padding: 4px 12px; border-radius: 8px; background: rgba(255,255,255,0.1); font-size: 14px; }
+    
+    .decision-action {
+      text-align: center;
+    }
+    .action-btn {
+      background: var(--accent-blue); color: #fff; padding: 16px 32px; border-radius: 12px; font-size: 24px; font-weight: 700; letter-spacing: 2px; box-shadow: 0 0 20px rgba(56, 189, 248, 0.4); margin-bottom: 8px;
+    }
+    
+    .opt-score {
+      font-size: 32px; font-weight: 700; color: var(--accent-purple); text-shadow: 0 0 10px var(--accent-purple);
+    }
+
+    /* KPI Row */
+    .metrics-container { grid-column: span 12; display: grid; grid-template-columns: repeat(4, 1fr); gap: 24px; }
+    .metric-card { display: flex; flex-direction: column; gap: 8px; }
+    .metric-title { font-size: 14px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; font-weight: 500; }
+    .metric-value { font-size: 32px; font-weight: 600; display: flex; align-items: baseline; gap: 8px; }
+    .metric-unit { font-size: 16px; color: var(--text-muted); }
+
+    /* Layout Sections */
+    .col-8 { grid-column: span 8; }
+    .col-4 { grid-column: span 4; }
+    .col-6 { grid-column: span 6; }
+    
+    .panel-title { font-size: 18px; font-weight: 500; margin-bottom: 24px; display: flex; align-items: center; gap: 12px; }
+    .panel-title i { color: var(--accent-blue); }
+    .canvas-wrapper { position: relative; width: 100%; height: 300px; display: flex; justify-content: center; }
+
+    /* Progress Bars for Sufficiency */
+    .progress-group { margin-bottom: 16px; }
+    .progress-label { display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 14px; }
+    .progress-bar-bg { background: rgba(255,255,255,0.1); height: 8px; border-radius: 4px; overflow: hidden; }
+    .progress-fill { height: 100%; background: var(--accent-blue); border-radius: 4px; transition: width 1s ease; }
+    .fill-peak { background: var(--accent-orange); }
+    .fill-emerg { background: var(--accent-red); }
+
+    /* Explainable AI Factors */
+    .factor-item { display: flex; justify-content: space-between; align-items: center; padding: 12px; background: rgba(255,255,255,0.05); border-radius: 8px; margin-bottom: 8px; }
+    .factor-name { font-weight: 500; }
+    .factor-weight { color: var(--accent-purple); font-weight: 700; }
+
+    /* Scenarios & Alerts */
+    .scenario-item { padding: 16px; border-radius: 12px; background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border-color); margin-bottom: 16px; }
+    .scenario-header { display: flex; justify-content: space-between; margin-bottom: 8px; }
+    .scenario-header h4 { font-size: 16px; color: var(--accent-purple); }
+    .scenario-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 14px; color: var(--text-muted); }
+    .scenario-response { margin-top: 12px; padding-top: 12px; border-top: 1px dashed var(--border-color); font-size: 14px; font-weight: 500; color: var(--accent-blue); }
+
+    .alert-item { padding: 16px; border-radius: 12px; background: rgba(239, 68, 68, 0.1); border-left: 4px solid var(--accent-red); margin-bottom: 16px; display: flex; align-items: flex-start; gap: 12px; }
+    .alert-item i { margin-top: 4px; }
+    .alert-high { background: rgba(239, 68, 68, 0.1); border-left-color: var(--accent-red); color: var(--accent-red); }
+    .alert-med { background: rgba(245, 158, 11, 0.1); border-left-color: var(--accent-orange); color: var(--accent-orange); }
+    .alert-low { background: rgba(56, 189, 248, 0.1); border-left-color: var(--accent-blue); color: var(--accent-blue); }
+
+    /* Custom Scrollbar */
+    ::-webkit-scrollbar { width: 8px; }
+    ::-webkit-scrollbar-track { background: var(--bg-dark); }
+    ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 4px; }
+  </style>
+</head>
+<body>
+
+  <header>
+    <h1><i class="fa-solid fa-shield-halved"></i> GeoSecure AI: Strategic Reserve Optimisation</h1>
+    <div class="status-badge status-safe" id="headerStatus">
+      <i class="fa-solid fa-check-circle"></i> SYSTEM ACTIVE
+    </div>
+  </header>
+
+  <div class="dashboard-container">
+    
+    <!-- Hero Decision Panel -->
+    <div class="glass-panel decision-panel">
+      <div class="decision-info">
+        <h2 id="actionTitle">AI Recommendation: HOLD</h2>
+        <p id="rationaleText">Loading AI rationale...</p>
+        <div class="confidence-badge"><i class="fa-solid fa-brain"></i> Confidence: <span id="confScore">--</span>% (<span id="confLevel">--</span>)</div>
+      </div>
+      <div class="decision-action">
+        <div class="action-btn" id="actionBtn">HOLD</div>
+        <div style="margin-top: 12px; font-size: 14px; color: var(--text-muted);">Optimization Score</div>
+        <div class="opt-score" id="optScore">--/100</div>
+      </div>
+    </div>
+
+    <!-- KPIs -->
+    <div class="metrics-container">
+      <div class="glass-panel metric-card">
+        <span class="metric-title">Target Reserve Fill</span>
+        <div class="metric-value" id="fillRatio">--<span class="metric-unit">%</span></div>
+        <div style="font-size:13px; color:var(--text-muted);" id="fillStatus">Target: 90%</div>
+      </div>
+      <div class="glass-panel metric-card">
+        <span class="metric-title">Brent Crude Price</span>
+        <div class="metric-value" id="brentPrice">$--<span class="metric-unit">/bbl</span></div>
+        <div style="font-size:13px; color:var(--text-muted);" id="priceStatus">Status: --</div>
+      </div>
+      <div class="glass-panel metric-card">
+        <span class="metric-title">Overall Risk Score</span>
+        <div class="metric-value" id="riskScore">--<span class="metric-unit">/100</span></div>
+        <div style="font-size:13px; color:var(--text-muted);" id="riskLevel">Level: --</div>
+      </div>
+      <div class="glass-panel metric-card">
+        <span class="metric-title">Economic Budget Impact</span>
+        <div class="metric-value" id="budgetImpact" style="font-size: 24px;">--</div>
+        <div style="font-size:13px; color:var(--text-muted);" id="estCost">Cost: $0</div>
+      </div>
+    </div>
+
+    <!-- Charts Row 1 -->
+    <div class="glass-panel col-4">
+      <div class="panel-title"><i class="fa-solid fa-database"></i> Reserve Capacity vs Fill</div>
+      <div class="canvas-wrapper"><canvas id="reserveChart"></canvas></div>
+    </div>
+
+    <div class="glass-panel col-8">
+      <div class="panel-title"><i class="fa-solid fa-chart-line"></i> Price Trends & 90-Day AI Forecast</div>
+      <div class="canvas-wrapper"><canvas id="priceChart"></canvas></div>
+    </div>
+
+    <!-- Sufficiency & AI Factors Row -->
+    <div class="glass-panel col-6">
+      <div class="panel-title"><i class="fa-solid fa-hourglass-half"></i> Reserve Sufficiency Analysis</div>
+      
+      <div class="progress-group">
+        <div class="progress-label"><span>Normal Demand</span><span id="daysNormal">-- Days</span></div>
+        <div class="progress-bar-bg"><div class="progress-fill" id="barNormal" style="width: 0%"></div></div>
+      </div>
+      <div class="progress-group">
+        <div class="progress-label"><span>Peak Demand (1.5x)</span><span id="daysPeak">-- Days</span></div>
+        <div class="progress-bar-bg"><div class="progress-fill fill-peak" id="barPeak" style="width: 0%"></div></div>
+      </div>
+      <div class="progress-group">
+        <div class="progress-label"><span>Emergency Disrupted (2x)</span><span id="daysEmerg">-- Days</span></div>
+        <div class="progress-bar-bg"><div class="progress-fill fill-emerg" id="barEmerg" style="width: 0%"></div></div>
+      </div>
+      
+      <div style="margin-top: 24px; border-top: 1px solid var(--border-color); padding-top: 16px;">
+        <h4 style="margin-bottom: 8px; color: var(--accent-blue);">Procurement Strategy</h4>
+        <p style="font-size:14px; color: var(--text-muted);" id="procWindow">Window: --</p>
+        <p style="font-size:14px; color: var(--text-muted);" id="procTimeline">Timeline: --</p>
+      </div>
+    </div>
+
+    <div class="glass-panel col-6">
+      <div class="panel-title"><i class="fa-solid fa-network-wired"></i> Explainable AI Decision Factors</div>
+      <div id="aiFactorsContainer">
+        <!-- populated via js -->
+      </div>
+      <div style="margin-top: 16px; font-size: 13px; color: var(--text-muted); font-style: italic;">
+        <i class="fa-solid fa-lightbulb" style="color:var(--accent-orange)"></i> Outcomes: <span id="aiOutcomes">--</span>
+      </div>
+    </div>
+
+    <!-- Risk Radar & Scenarios Row -->
+    <div class="glass-panel col-4">
+      <div class="panel-title"><i class="fa-solid fa-triangle-exclamation"></i> Supply Risk Breakdown</div>
+      <div class="canvas-wrapper"><canvas id="riskChart"></canvas></div>
+    </div>
+
+    <div class="glass-panel col-4">
+      <div class="panel-title"><i class="fa-solid fa-hurricane"></i> Simulated Scenarios</div>
+      <div id="scenariosContainer" style="max-height: 300px; overflow-y: auto; padding-right: 8px;">
+        <!-- Scenarios -->
+      </div>
+    </div>
+
+    <div class="glass-panel col-4">
+      <div class="panel-title"><i class="fa-solid fa-bell"></i> Smart Alerts</div>
+      <div id="alertsContainer" style="max-height: 300px; overflow-y: auto; padding-right: 8px;">
+        <!-- Alerts -->
+      </div>
+    </div>
+
+  </div>
+
+  <script src="dashboard_data.js"></script>
+  <script>
+    // Auto-refresh the dashboard every 10 seconds to pull the latest agent data
+    setTimeout(() => {
+      window.location.reload();
+    }, 10000);
+
+    if (typeof dashboardData === 'undefined') {
+      document.body.innerHTML = '<div style="padding: 50px; text-align: center;"><h2>Awaiting Agent Execution...</h2><p>Please run the Strategic Reserve Optimisation Agent to generate the dashboard data.</p></div>';
+      throw new Error("Awaiting agent data.");
+    }
+
+    const d = dashboardData;
+
+    // --- Populate DOM Elements ---
+    
+    // Header & Decision
+    const action = d.decision?.action || "HOLD";
+    document.getElementById('actionBtn').innerText = action;
+    
+    if(action === 'BUY') document.getElementById('actionBtn').style.background = 'var(--accent-red)';
+    else if(action === 'RELEASE') document.getElementById('actionBtn').style.background = 'var(--accent-green)';
+    
+    document.getElementById('actionTitle').innerText = `AI Recommendation: ${action}`;
+    document.getElementById('rationaleText').innerText = d.explainable_ai?.detailed_rationale || d.decision?.explainable_rationale || "No rationale provided.";
+    document.getElementById('confScore').innerText = d.decision_confidence?.score || d.decision?.confidence_score_percent || "80";
+    document.getElementById('confLevel').innerText = d.decision_confidence?.level || d.decision_confidence?.confidence_level || "High";
+    document.getElementById('optScore').innerText = (d.optimization_score?.overall_optimization_score || d.optimization_score?.overall_score || "--") + "/100";
+
+    // KPIs
+    document.getElementById('fillRatio').innerHTML = `${d.reserve_status?.fill_ratio_percent || 0}<span class="metric-unit">%</span>`;
+    document.getElementById('fillStatus').innerText = `Target: ${d.target_reserve_info?.target_fill_percent || 90}%`;
+    
+    document.getElementById('brentPrice').innerHTML = `$${d.oil_prices?.brent_price || 0}<span class="metric-unit">/bbl</span>`;
+    document.getElementById('priceStatus').innerText = `Status: ${d.market_condition?.price_status || 'Unknown'} | Volatility: ${d.market_condition?.volatility_level || 'Unknown'}`;
+    
+    document.getElementById('riskScore').innerHTML = `${d.supply_risk?.risk_score || d.supply_risk?.overall_risk_score || 0}<span class="metric-unit">/100</span>`;
+    document.getElementById('riskLevel').innerText = `Level: ${d.supply_risk?.risk_level || 'Unknown'}`;
+    
+    document.getElementById('budgetImpact').innerText = d.economic_impact?.budget_impact || "NEUTRAL";
+    const cost = d.economic_impact?.estimated_procurement_cost_usd || d.decision?.estimated_cost_usd || 0;
+    document.getElementById('estCost').innerText = `Est Cost: $${cost.toLocaleString()}`;
+
+    // Sufficiency
+    const norm = d.reserve_sufficiency?.days_of_supply_normal_demand || d.depletion_prediction?.days_remaining_normal || 0;
+    const peak = d.reserve_sufficiency?.days_of_supply_peak_demand || 0;
+    const emerg = d.reserve_sufficiency?.days_of_supply_emergencies || d.depletion_prediction?.days_remaining_disrupted || 0;
+    
+    document.getElementById('daysNormal').innerText = `${norm.toFixed(1)} Days`;
+    document.getElementById('daysPeak').innerText = `${peak.toFixed(1)} Days`;
+    document.getElementById('daysEmerg').innerText = `${emerg.toFixed(1)} Days`;
+    
+    setTimeout(() => {
+      document.getElementById('barNormal').style.width = Math.min(100, (norm / 300) * 100) + "%";
+      document.getElementById('barPeak').style.width = Math.min(100, (peak / 300) * 100) + "%";
+      document.getElementById('barEmerg').style.width = Math.min(100, (emerg / 300) * 100) + "%";
+    }, 100);
+
+    document.getElementById('procWindow').innerText = `Window: ${d.procurement_window?.best_time_to_procure || '--'}`;
+    document.getElementById('procTimeline').innerText = `Timeline: ${d.procurement_window?.suggested_purchase_timeline || '--'}`;
+
+    // AI Factors
+    const factors = d.decision_factors || [];
+    let factorsHTML = "";
+    factors.forEach(f => {
+      factorsHTML += `
+        <div class="factor-item">
+          <span class="factor-name">${f.factor}</span>
+          <span class="factor-weight">${(f.weight_importance * 100).toFixed(0)}% Weight</span>
+        </div>
+      `;
+    });
+    if(!factorsHTML) factorsHTML = "<p style='color:var(--text-muted)'>No factors listed.</p>";
+    document.getElementById('aiFactorsContainer').innerHTML = factorsHTML;
+    
+    const outcomes = d.explainable_ai?.expected_outcomes || [];
+    document.getElementById('aiOutcomes').innerText = Array.isArray(outcomes) ? outcomes.join(", ") : outcomes;
+
+    // Scenarios
+    const scenarios = d.scenario_simulation || d.scenarios || [];
+    let scHTML = "";
+    scenarios.forEach(s => {
+      scHTML += `
+        <div class="scenario-item">
+          <div class="scenario-header">
+            <h4>${s.name}</h4>
+            <span style="color: var(--accent-red); font-weight: bold;">+${s.price_shock_estimation_percent || s.simulated_price_shock_percent || 0}% Shock</span>
+          </div>
+          <div class="scenario-stats">
+            <span>Depletion: ${s.reserve_depletion_impact_days || s.depletion_days_remaining || 0} Days</span>
+          </div>
+          <div class="scenario-response">AI Action: ${s.recommended_response}</div>
+        </div>
+      `;
+    });
+    document.getElementById('scenariosContainer').innerHTML = scHTML;
+
+    // Alerts
+    const alerts = d.smart_alerts || d.alerts || [];
+    let alHTML = "";
+    alerts.forEach(a => {
+      let cls = 'alert-low';
+      let icon = 'fa-info-circle';
+      if(a.severity === 'HIGH' || a.severity === 'CRITICAL') { cls = 'alert-high'; icon = 'fa-triangle-exclamation'; }
+      else if(a.severity === 'MEDIUM' || a.severity === 'WARNING') { cls = 'alert-med'; icon = 'fa-exclamation-circle'; }
+      
+      alHTML += `
+        <div class="alert-item ${cls}">
+          <i class="fa-solid ${icon}"></i>
+          <div>
+            <h4 style="font-size:15px; margin-bottom:4px;">${a.type}</h4>
+            <p style="font-size:13px; color:var(--text-muted);">${a.message}</p>
+          </div>
+        </div>
+      `;
+    });
+    if(!alHTML) alHTML = "<p style='color:var(--text-muted)'>No active alerts.</p>";
+    document.getElementById('alertsContainer').innerHTML = alHTML;
+
+
+    // --- Render Charts ---
+    Chart.defaults.color = '#94a3b8';
+    Chart.defaults.font.family = "'Outfit', sans-serif";
+
+    // 1. Doughnut Chart (Reserve Fill)
+    new Chart(document.getElementById('reserveChart'), {
+      type: 'doughnut',
+      data: {
+        labels: ['Filled', 'Empty Capacity'],
+        datasets: [{
+          data: [
+            d.reserve_status?.current_fill_barrels || 0,
+            (d.reserve_status?.capacity_barrels || 1) - (d.reserve_status?.current_fill_barrels || 0)
+          ],
+          backgroundColor: ['#38bdf8', 'rgba(255,255,255,0.1)'],
+          borderWidth: 0,
+          cutout: '75%'
+        }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { position: 'bottom' } }
+      }
+    });
+
+    // 2. Line Chart (Prices)
+    new Chart(document.getElementById('priceChart'), {
+      type: 'line',
+      data: {
+        labels: ['Current', '30 Days', '60 Days', '90 Days'],
+        datasets: [
+          {
+            label: 'Brent Crude Forecast ($/bbl)',
+            data: [
+              d.oil_prices?.brent_price || 0,
+              d.price_forecast?.forecast_30d || d.forecasts?.forecast_30d || 0,
+              d.price_forecast?.forecast_60d || d.forecasts?.forecast_60d || 0,
+              d.price_forecast?.forecast_90d || d.forecasts?.forecast_90d || 0
+            ],
+            borderColor: '#a855f7',
+            backgroundColor: 'rgba(168, 85, 247, 0.1)',
+            borderWidth: 3,
+            tension: 0.4,
+            fill: true
+          }
+        ]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        scales: { y: { beginAtZero: false, grid: { color: 'rgba(255,255,255,0.05)' } }, x: { grid: { display: false } } }
+      }
+    });
+
+    // 3. Radar Chart (Risk Breakdown)
+    new Chart(document.getElementById('riskChart'), {
+      type: 'radar',
+      data: {
+        labels: ['Geopolitical', 'Weather', 'Disaster', 'Inventory'],
+        datasets: [{
+          label: 'Risk Score (0-100)',
+          data: [
+            d.supply_risk?.geopolitical_risk || 0,
+            d.supply_risk?.weather_risk || 0,
+            d.supply_risk?.disaster_risk || 0,
+            d.supply_risk?.inventory_risk || 0
+          ],
+          backgroundColor: 'rgba(239, 68, 68, 0.2)',
+          borderColor: '#ef4444',
+          pointBackgroundColor: '#ef4444',
+          borderWidth: 2
+        }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        scales: {
+          r: {
+            angleLines: { color: 'rgba(255,255,255,0.1)' },
+            grid: { color: 'rgba(255,255,255,0.1)' },
+            pointLabels: { color: '#f8fafc', font: { size: 12 } },
+            ticks: { display: false, min: 0, max: 100 }
+          }
+        },
+        plugins: { legend: { display: false } }
+      }
+    });
+  </script>
+</body>
+</html>
