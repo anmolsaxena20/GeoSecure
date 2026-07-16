@@ -5,6 +5,7 @@ import {Analytics} from '@vercel/analytics/react'
 import GeoSecureHome from './GeoSecureHome.jsx'
 import Login from './Login.jsx'
 import Signup from './Signup.jsx'
+import Dashboard from './Dashboard.jsx'
 
 export default function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
@@ -51,12 +52,16 @@ export default function App() {
           element={<GeoSecureHome onLogout={handleLogout} isAuthenticated={isAuthenticated} />} 
         />
         <Route 
+          path="/dashboard" 
+          element={isAuthenticated ? <Dashboard onLogout={handleLogout} /> : <Navigate to="/login" />} 
+        />
+        <Route 
           path="/login" 
-          element={isAuthenticated ? <Navigate to="/" /> : <Login onLoginSuccess={handleLoginSuccess} />} 
+          element={isAuthenticated ? <Navigate to="/dashboard" /> : <Login onLoginSuccess={handleLoginSuccess} />} 
         />
         <Route 
           path="/signup" 
-          element={isAuthenticated ? <Navigate to="/" /> : <Signup onSignupSuccess={handleLoginSuccess} />} 
+          element={isAuthenticated ? <Navigate to="/dashboard" /> : <Signup onSignupSuccess={handleLoginSuccess} />} 
         />
         <Route path="*" element={<Navigate to="/" />} />
       </Routes>

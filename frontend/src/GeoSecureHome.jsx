@@ -648,8 +648,8 @@ export default function GeoSecureHome({ isAuthenticated, onLogout }) {
               <button className="rounded-sm bg-[#4ff0d7] px-6 py-3 font-mono text-xs font-semibold uppercase tracking-widest text-[#04141c] transition-colors hover:bg-[#7bf5e1]">
                 Request access
               </button>
-              <button className="group flex items-center gap-2 font-mono text-xs uppercase tracking-widest text-[#e8f1f2] transition-colors hover:text-[#4ff0d7]">
-                View live map
+              <button className="group flex items-center gap-2 font-mono text-xs uppercase tracking-widest text-[#e8f1f2] transition-colors hover:text-[#4ff0d7]" onClick={() => window.location.href = '/dashboard'}>
+                View Dashboard
                 <span className="transition-transform group-hover:translate-x-1">
                   &rarr;
                 </span>
