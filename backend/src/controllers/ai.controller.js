@@ -14,6 +14,10 @@ const disruptionScenarioDataPath = path.resolve(
   __dirname,
   "../../../ai/agents/dashboard_data.js",
 );
+const reserveOptimisationDataPath = path.resolve(
+  __dirname,
+  "../../../ai/agents/dashboard_data.js",
+);
 
 const disruptionCacheKeys = {
   RunDisruptionAgent: "cache:disruption:run",
@@ -169,6 +173,22 @@ export const getDisruptionScenarios = async (_req, res, next) => {
 
     if (!match) {
       throw new Error("Unable to parse disruption scenario data");
+    }
+
+    const structured = new Function(`return (${match[1]});`)();
+    return res.status(200).json(structured);
+  } catch (error) {
+    return next(error);
+  }
+};
+
+export const getReserveOptimisationData = async (_req, res, next) => {
+  try {
+    const fileContents = await fs.readFile(reserveOptimisationDataPath, "utf8");
+    const match = fileContents.match(/const\s+dashboardData\s*=\s*([\s\S]*?);\s*$/);
+
+    if (!match) {
+      throw new Error("Unable to parse reserve optimisation data");
     }
 
     const structured = new Function(`return (${match[1]});`)();

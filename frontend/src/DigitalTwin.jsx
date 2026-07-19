@@ -67,7 +67,7 @@ const initialNodes = [
   { id: 3, name: 'Kochi Storage Hub', type: 'Terminal', health: 91, capacity: '220,000 bbl/d' },
 ]
 
-export default function DigitalTwin({ isAuthenticated }) {
+export default function DigitalTwin({ isAuthenticated, onLogout }) {
   const [activeTab, setActiveTab] = useState('simulation')
   const [scenario, setScenario] = useState('normal')
   const [selectedNode, setSelectedNode] = useState(null)
@@ -164,21 +164,15 @@ export default function DigitalTwin({ isAuthenticated }) {
           <div className="flex items-center gap-3">
             <Link
               to="/"
-              className="font-mono text-xs uppercase tracking-[0.25em] text-[#8fa3ad] transition-colors hover:text-[#e8f1f2]"
-            >
-              Overview
-            </Link>
-            <Link
-              to="/dashboard"
-              className="font-mono text-xs uppercase tracking-[0.25em] text-[#8fa3ad] transition-colors hover:text-[#e8f1f2]"
-            >
-              Dashboard
-            </Link>
-            <button
-              onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
               className="rounded-sm border border-white/10 bg-white/5 px-3 py-2 font-mono text-[11px] uppercase tracking-[0.25em] text-[#e8f1f2] transition-colors hover:border-[#4ff0d7]/30 hover:text-[#4ff0d7]"
             >
-              Top
+              Back home
+            </Link>
+            <button
+              onClick={onLogout}
+              className="rounded-sm border border-red-500/30 bg-red-500/10 px-3 py-2 font-mono text-[11px] uppercase tracking-[0.25em] text-red-300 transition-colors hover:border-red-400/50 hover:bg-red-500/20"
+            >
+              Logout
             </button>
           </div>
         </nav>

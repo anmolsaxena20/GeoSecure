@@ -4,6 +4,7 @@ import {
   fetchNews,
   generateReport,
   getDisruptionScenarios,
+  getReserveOptimisationData,
   getCommodityRiskScores,
   getCorridorRiskScores,
   getHighRiskEvents,
@@ -17,6 +18,7 @@ router.get("/report", generateReport);
 router.get("/market", fetchMarketData);
 router.get("/news", fetchNews);
 router.get("/scenarios", getDisruptionScenarios);
+router.get("/reserve-optimisation", getReserveOptimisationData);
 router.post("/disruption/run", runDisruptionAgent);
 router.get("/disruption/corridors", getCorridorRiskScores);
 router.get("/disruption/commodities", getCommodityRiskScores);

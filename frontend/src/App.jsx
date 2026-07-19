@@ -9,6 +9,7 @@ import Profile from './Profile.jsx'
 import DigitalTwin from './DigitalTwin.jsx'
 import ProcumentOrchestrator from './ProcumentOrchestrator.jsx'
 import DisruptionScenario from './DisruptionScenario.jsx'
+import ReserveOptimisation from './ReserveOptimisation.jsx'
 import { API_ENDPOINTS } from './config/api.js'
 import Dashboard from './Dashboard.jsx'
 
@@ -116,7 +117,15 @@ export default function App() {
           path="/disruption-scenario"
           element={isAuthenticated ? <DisruptionScenario onLogout={handleLogout} /> : <Navigate to="/login" />}
         />
-        <Route path="/digitaltwin" element={<DigitalTwin isAuthenticated={isAuthenticated} />} />
+        <Route
+          path="/reserve-optimisation"
+          element={isAuthenticated ? <ReserveOptimisation onLogout={handleLogout} /> : <Navigate to="/login" />}
+        />
+        <Route
+          path="/profile"
+          element={isAuthenticated ? <Profile onLogout={handleLogout} /> : <Navigate to="/login" />}
+        />
+        <Route path="/digitaltwin" element={<DigitalTwin isAuthenticated={isAuthenticated} onLogout={handleLogout} />} />
         <Route path="*" element={<Navigate to="/" />} />
       </Routes>
     </Router>

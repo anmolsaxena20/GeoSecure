@@ -24,6 +24,9 @@ export const API_ENDPOINTS = {
   DISRUPTION: {
     SCENARIOS: `${API_BASE_URL}/api/disruption/scenarios`,
   },
+  RESERVE_OPTIMISATION: {
+    DATA: `${API_BASE_URL}/api/disruption/reserve-optimisation`,
+  },
 };
 
 export default API_BASE_URL;
