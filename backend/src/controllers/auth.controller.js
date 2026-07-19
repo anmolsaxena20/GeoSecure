@@ -21,7 +21,7 @@ const sanitizeUser = (user) => {
     name: user.name,
     email: user.email,
     isVerified: user.isVerified,
-    cloudinaryUrl: user.cloudinaryUrl,
+    imageUrl: user.imageUrl,
     themePreference: user.themePreference,
     authProvider: user.authProvider,
     googleId: user.googleId,
@@ -174,9 +174,8 @@ export const googleSuccess = async (req, res, next) => {
     await persistRefreshToken(user.id, tokens.refreshToken);
     res.cookie("refreshToken", tokens.refreshToken, cookieOptions);
 
-    const redirectUrl = new URL(
-      `${process.env.FRONTEND_URL}/dashboard` || "http://localhost:5173",
-    );
+    const frontendBase = process.env.FRONTEND_URL || "http://localhost:5173";
+    const redirectUrl = new URL("/profile", frontendBase);
     redirectUrl.searchParams.set("accessToken", tokens.accessToken);
     redirectUrl.searchParams.set("user", JSON.stringify(sanitizeUser(user)));
 
@@ -189,6 +188,7 @@ export const googleSuccess = async (req, res, next) => {
 export const googleFailure = async (_req, res, next) => {
   try {
     const redirectUrl = new URL(
+      "/",
       process.env.FRONTEND_URL || "http://localhost:5173",
     );
     redirectUrl.searchParams.set("error", "google_auth_failed");

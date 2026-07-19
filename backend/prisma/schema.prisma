@@ -34,6 +34,8 @@ model User {
   isVerified      Boolean         @default(false)
   refreshToken    String?
   imageUrl        String          @default("https://res.cloudinary.com/djd94qxqr/image/upload/v1782917594/default_cjpams.png")
+  commodity       String?
+  
   themePreference ThemePreference @default(SYSTEM)
   authProvider    AuthProvider    @default(LOCAL)
   googleId        String?         @unique

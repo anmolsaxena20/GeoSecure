@@ -9,7 +9,7 @@ const publicUserFields = {
   name: true,
   email: true,
   isVerified: true,
-  cloudinaryUrl: true,
+  imageUrl: true,
   themePreference: true,
   authProvider: true,
   googleId: true,
@@ -34,6 +34,20 @@ export const getUsers = async (_req, res, next) => {
     return res.status(200).json({ users });
   } catch (error) {
     return next(error);
+  }
+};
+export const changeTheme = async (req, res, next) => {
+  try {
+    const theme = req.body.theme;
+    const userId = req.user.id;
+    const user = await prisma.user.update({
+      where: { id: userId },
+      data: { themePreference: theme },
+      select: publicUserFields,
+    });
+    res.status(200).json({ user });
+  } catch (error) {
+    next(error);
   }
 };
 
