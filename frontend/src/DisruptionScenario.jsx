@@ -203,14 +203,8 @@ export default function DisruptionScenario({ onLogout }) {
           </Link>
 
           <div className="flex flex-wrap items-center gap-3">
-            <Link to="/dashboard" className="rounded-full border border-white/10 bg-white/5 px-4 py-2 font-mono text-[11px] uppercase tracking-[0.28em] text-[#e8f1f2] transition-colors hover:border-[#4ff0d7]/30 hover:text-[#4ff0d7]">
-              Dashboard
-            </Link>
-            <Link to="/procurement-orchestrator" className="rounded-full border border-white/10 bg-white/5 px-4 py-2 font-mono text-[11px] uppercase tracking-[0.28em] text-[#e8f1f2] transition-colors hover:border-[#4ff0d7]/30 hover:text-[#4ff0d7]">
-              Procument Orchestrator
-            </Link>
-            <Link to="/disruption-scenario" className="rounded-full border border-[#ffb454]/30 bg-[#ffb454]/10 px-4 py-2 font-mono text-[11px] uppercase tracking-[0.28em] text-[#ffb454]">
-              Disruption Scenario
+            <Link to="/" className="rounded-full border border-white/10 bg-white/5 px-4 py-2 font-mono text-[11px] uppercase tracking-[0.28em] text-[#e8f1f2] transition-colors hover:border-[#4ff0d7]/30 hover:text-[#4ff0d7]">
+              Back home
             </Link>
             <button
               onClick={onLogout}

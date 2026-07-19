@@ -249,7 +249,7 @@ export default function Dashboard({ onLogout }) {
 
       <div className="relative z-10 flex min-h-screen flex-col">
         <nav className="flex items-center justify-between px-6 py-6 lg:px-16">
-          <Link to="/dashboard" className="flex items-center gap-2 transition-opacity hover:opacity-80">
+          <Link to="/" className="flex items-center gap-2 transition-opacity hover:opacity-80">
             <svg width="20" height="20" viewBox="0 0 20 20" fill="none" className="text-[#4ff0d7]">
               <circle cx="10" cy="10" r="7" stroke="currentColor" strokeWidth="1.2" />
               <path d="M10 1V5M10 15V19M1 10H5M15 10H19" stroke="currentColor" strokeWidth="1.2" />
@@ -259,12 +259,12 @@ export default function Dashboard({ onLogout }) {
           </Link>
 
           <div className="flex items-center gap-3">
-            <Link to="/" className="font-mono text-xs uppercase tracking-[0.25em] text-[#8fa3ad] transition-colors hover:text-[#e8f1f2]">
-              Overview
+            <Link to="/" className="rounded-sm border border-white/10 bg-white/5 px-3 py-2 font-mono text-[11px] uppercase tracking-[0.25em] text-[#e8f1f2] transition-colors hover:border-[#4ff0d7]/30 hover:text-[#4ff0d7]">
+              Back home
             </Link>
             <button
               onClick={onLogout}
-              className="rounded-sm border border-white/10 bg-white/5 px-3 py-2 font-mono text-[11px] uppercase tracking-[0.25em] text-[#e8f1f2] transition-colors hover:border-[#4ff0d7]/30 hover:text-[#4ff0d7]"
+              className="rounded-sm border border-red-500/30 bg-red-500/10 px-3 py-2 font-mono text-[11px] uppercase tracking-[0.25em] text-red-300 transition-colors hover:border-red-400/50 hover:bg-red-500/20"
             >
               Logout
             </button>

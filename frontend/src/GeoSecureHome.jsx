@@ -2,7 +2,6 @@ import React, { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import * as THREE from "three";
 import { useTheme } from "./ThemeContext.jsx";
-import ThemeSlider from "./ThemeSlider.jsx";
 
 /* ----------------------------------------------------------------------
    GeoSecure — geospatial threat intelligence landing page
@@ -641,9 +640,6 @@ export default function GeoSecureHome({ isAuthenticated, onLogout }) {
           </div>
           
           <div className="flex items-center gap-3">
-            {/* Theme slider positioned at the top */}
-            <ThemeSlider isAuthenticated={isAuthenticated} />
-            
             {isAuthenticated ? (
               <>
                 <Link

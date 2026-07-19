@@ -349,11 +349,8 @@ export default function ProcumentOrchestrator({ onLogout }) {
           </Link>
 
           <div className="flex flex-wrap items-center gap-3">
-            <Link to="/dashboard" className="rounded-full border border-white/10 bg-white/5 px-4 py-2 font-mono text-[11px] uppercase tracking-[0.28em] text-[#e8f1f2] transition-colors hover:border-[#4ff0d7]/30 hover:text-[#4ff0d7]">
-              Dashboard
-            </Link>
-            <Link to="/procurement-orchestrator" className="rounded-full border border-[#4ff0d7]/30 bg-[#4ff0d7]/10 px-4 py-2 font-mono text-[11px] uppercase tracking-[0.28em] text-[#4ff0d7]">
-              Procument Orchestrator
+            <Link to="/" className="rounded-full border border-white/10 bg-white/5 px-4 py-2 font-mono text-[11px] uppercase tracking-[0.28em] text-[#e8f1f2] transition-colors hover:border-[#4ff0d7]/30 hover:text-[#4ff0d7]">
+              Back home
             </Link>
             <button
               onClick={onLogout}

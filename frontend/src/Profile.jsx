@@ -18,7 +18,6 @@ import {
 } from "lucide-react";
 import { API_ENDPOINTS } from "./config/api.js";
 import { useTheme } from "./ThemeContext.jsx";
-import ThemeSlider from "./ThemeSlider.jsx";
 
 const themeOptions = ["SYSTEM", "LIGHT", "DARK"];
 
@@ -356,7 +355,6 @@ export default function Profile({ onLogout }) {
           </Link>
 
           <div className="flex items-center gap-3">
-            <ThemeSlider isAuthenticated={!!token} />
             <Link
               to="/"
               className="rounded-full border border-slate-200 dark:border-white/10 bg-slate-100 dark:bg-white/5 px-4 py-2 font-mono text-xs uppercase tracking-widest text-slate-500 dark:text-[#8fa3ad] transition-colors hover:bg-slate-200 dark:hover:bg-white/10 hover:text-slate-900 dark:hover:text-[#e8f1f2]"
@@ -365,7 +363,7 @@ export default function Profile({ onLogout }) {
             </Link>
             <button
               onClick={handleLogout}
-              className="inline-flex items-center gap-2 rounded-full border border-slate-200 dark:border-white/10 bg-slate-100 dark:bg-white/5 px-4 py-2 font-mono text-xs uppercase tracking-widest text-slate-500 dark:text-[#8fa3ad] transition-colors hover:bg-slate-200 dark:hover:bg-white/10 hover:text-slate-900 dark:hover:text-[#e8f1f2]"
+              className="inline-flex items-center gap-2 rounded-full border border-red-500/30 bg-red-500/10 px-4 py-2 font-mono text-xs uppercase tracking-widest text-red-600 dark:text-red-300 transition-colors hover:bg-red-500/20 hover:border-red-400/50"
             >
               <LogOut className="h-3.5 w-3.5" />
               Logout
