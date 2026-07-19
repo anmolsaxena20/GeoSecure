@@ -121,6 +121,10 @@ export default function App() {
           path="/reserve-optimisation"
           element={isAuthenticated ? <ReserveOptimisation onLogout={handleLogout} /> : <Navigate to="/login" />}
         />
+        <Route
+          path="/profile"
+          element={isAuthenticated ? <Profile onLogout={handleLogout} /> : <Navigate to="/login" />}
+        />
         <Route path="/digitaltwin" element={<DigitalTwin isAuthenticated={isAuthenticated} onLogout={handleLogout} />} />
         <Route path="*" element={<Navigate to="/" />} />
       </Routes>

@@ -1,25 +1,7 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import {
-  AlertTriangle,
-  BadgeCheck,
-  Camera,
-  Loader2,
-  LogOut,
-  Mail,
-  Palette,
-  RefreshCw,
-  Save,
-  Shield,
-  Trash2,
-  Upload,
-  UserRound,
-  Lock,
-} from "lucide-react";
+import { AlertTriangle, Loader2, LogOut, Mail, Lock, Save, UserRound } from "lucide-react";
 import { API_ENDPOINTS } from "./config/api.js";
-import { useTheme } from "./ThemeContext.jsx";
-
-const themeOptions = ["SYSTEM", "LIGHT", "DARK"];
 
 function CrosshairMark() {
   return (
@@ -40,15 +22,6 @@ function getStoredUser() {
   }
 }
 
-function buildProfileForm(user) {
-  return {
-    name: user?.name || "",
-    email: user?.email || "",
-    imageUrl: user?.imageUrl || "",
-    themePreference: user?.themePreference || "SYSTEM",
-  };
-}
-
 function buildPasswordForm() {
   return {
     currentPassword: "",
@@ -57,37 +30,17 @@ function buildPasswordForm() {
   };
 }
 
-function Field({ label, icon: Icon, children, helper }) {
-  return (
-    <label className="block">
-      <span className="mb-2 flex items-center gap-2 font-mono text-[11px] uppercase tracking-[0.25em] text-slate-500 dark:text-[#8fa3ad]">
-        {Icon ? <Icon className="h-3.5 w-3.5" /> : null}
-        {label}
-      </span>
-      {children}
-      {helper ? <span className="mt-2 block text-xs text-slate-400 dark:text-[#5c7078]">{helper}</span> : null}
-    </label>
-  );
-}
-
 export default function Profile({ onLogout }) {
   const navigate = useNavigate();
-  const fileInputRef = useRef(null);
-  const { resolvedTheme, updateLocalTheme } = useTheme();
-  
   const [user, setUser] = useState(() => getStoredUser());
-  const [profileForm, setProfileForm] = useState(() => buildProfileForm(getStoredUser()));
   const [passwordForm, setPasswordForm] = useState(() => buildPasswordForm());
   const [loading, setLoading] = useState(true);
-  const [savingProfile, setSavingProfile] = useState(false);
   const [savingPassword, setSavingPassword] = useState(false);
-  const [uploadingAvatar, setUploadingAvatar] = useState(false);
-  const [deletingAccount, setDeletingAccount] = useState(false);
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
+  const [showPasswordForm, setShowPasswordForm] = useState(false);
 
   const token = localStorage.getItem("accessToken");
-  const isLocalAuth = user?.authProvider === "LOCAL";
 
   useEffect(() => {
     if (!token) {
@@ -115,13 +68,7 @@ export default function Profile({ onLogout }) {
 
         const nextUser = data.user;
         setUser(nextUser);
-        setProfileForm(buildProfileForm(nextUser));
         localStorage.setItem("profileUser", JSON.stringify(nextUser));
-        
-        // Sync theme with the central context on load
-        if (nextUser?.themePreference) {
-          updateLocalTheme(nextUser.themePreference);
-        }
       } catch (loadError) {
         setError(loadError.message);
         if (loadError.message === "Unauthorized") {
@@ -136,113 +83,9 @@ export default function Profile({ onLogout }) {
     loadProfile();
   }, [navigate, onLogout, token]);
 
-  const avatarLabel = (profileForm.name || user?.email || "A").trim().charAt(0).toUpperCase();
-
-  const updateProfileField = (field) => (event) => {
-    const value = event.target.value;
-    setProfileForm((current) => ({ ...current, [field]: value }));
-  };
-
   const updatePasswordField = (field) => (event) => {
     const value = event.target.value;
     setPasswordForm((current) => ({ ...current, [field]: value }));
-  };
-
-  const handleAvatarSelect = async (event) => {
-    const file = event.target.files?.[0];
-    event.target.value = "";
-
-    if (!file || !token) {
-      return;
-    }
-
-    setUploadingAvatar(true);
-    setError("");
-    setNotice("");
-
-    try {
-      const signatureResponse = await fetch(API_ENDPOINTS.USERS.UPLOAD, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-        credentials: "include",
-      });
-
-      const signatureData = await signatureResponse.json();
-
-      if (!signatureResponse.ok) {
-        throw new Error(signatureData.message || "Unable to prepare avatar upload");
-      }
-
-      const { uploadUrl, apiKey, timestamp, folder, signature } = signatureData.data;
-      const uploadForm = new FormData();
-      uploadForm.append("file", file);
-      uploadForm.append("api_key", apiKey);
-      uploadForm.append("timestamp", String(timestamp));
-      uploadForm.append("folder", folder);
-      uploadForm.append("signature", signature);
-
-      const uploadResponse = await fetch(uploadUrl, {
-        method: "POST",
-        body: uploadForm,
-      });
-
-      const uploadData = await uploadResponse.json();
-
-      if (!uploadResponse.ok) {
-        throw new Error(uploadData.error?.message || "Avatar upload failed");
-      }
-
-      const imageUrl = uploadData.secure_url || uploadData.url;
-      setProfileForm((current) => ({ ...current, imageUrl }));
-      setNotice("Avatar uploaded. Save profile to apply the new image.");
-    } catch (uploadError) {
-      setError(uploadError.message);
-    } finally {
-      setUploadingAvatar(false);
-    }
-  };
-
-  const handleProfileSave = async (event) => {
-    event.preventDefault();
-    if (!token) return;
-
-    setSavingProfile(true);
-    setError("");
-    setNotice("");
-
-    try {
-      const response = await fetch(API_ENDPOINTS.USERS.UPDATE, {
-        method: "PUT",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-        credentials: "include",
-        body: JSON.stringify(profileForm),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.message || "Profile update failed");
-      }
-
-      setUser(data.user);
-      setProfileForm(buildProfileForm(data.user));
-      localStorage.setItem("profileUser", JSON.stringify(data.user));
-      setNotice("Profile updated successfully.");
-      
-      // Update central theme context
-      if (data.user?.themePreference) {
-        updateLocalTheme(data.user.themePreference);
-        window.dispatchEvent(new Event("profileUserUpdated"));
-      }
-    } catch (saveError) {
-      setError(saveError.message);
-    } finally {
-      setSavingProfile(false);
-    }
   };
 
   const handlePasswordSave = async (event) => {
@@ -277,47 +120,11 @@ export default function Profile({ onLogout }) {
 
       setPasswordForm(buildPasswordForm());
       setNotice("Password updated successfully.");
+      setShowPasswordForm(false);
     } catch (passwordError) {
       setError(passwordError.message);
     } finally {
       setSavingPassword(false);
-    }
-  };
-
-  const handleDeleteAccount = async () => {
-    if (!token) return;
-    const confirmed = window.confirm(
-      "Delete your GeoSecure account? This will permanently remove your profile."
-    );
-
-    if (!confirmed) {
-      return;
-    }
-
-    setDeletingAccount(true);
-    setError("");
-
-    try {
-      const response = await fetch(API_ENDPOINTS.USERS.DELETE, {
-        method: "DELETE",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-        credentials: "include",
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.message || "Account deletion failed");
-      }
-
-      await onLogout?.();
-      navigate("/login", { replace: true });
-    } catch (deleteError) {
-      setError(deleteError.message);
-    } finally {
-      setDeletingAccount(false);
     }
   };
 
@@ -386,234 +193,125 @@ export default function Profile({ onLogout }) {
           ) : null}
 
           <section className="rounded-[32px] border border-slate-200/80 dark:border-white/10 bg-white/70 dark:bg-white/[0.04] p-6 shadow-xl shadow-slate-100/50 dark:shadow-black/20 backdrop-blur-xl lg:p-8">
-            <div className="flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
+            <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
               <div className="max-w-2xl">
-                <div className="font-mono text-[10px] uppercase tracking-[0.35em] text-teal-600 dark:text-[#4ff0d7]">Account settings</div>
+                <div className="font-mono text-[10px] uppercase tracking-[0.35em] text-teal-600 dark:text-[#4ff0d7]">Account</div>
                 <h1 className="mt-3 font-display text-3xl leading-tight text-slate-900 dark:text-[#f4f8f9] sm:text-4xl">
                   Profile
                 </h1>
                 <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-500 dark:text-[#8fa3ad] sm:text-base">
-                  Update the information tied to your GeoSecure account, keep your security details current, and manage your profile photo from one standard settings page.
+                  View your name and email, then update your password when needed.
                 </p>
               </div>
 
-              {/* Avatar Box with dynamic theme background */}
-              <div className="flex items-center gap-4 rounded-3xl border border-slate-200/80 dark:border-white/10 bg-slate-100/50 dark:bg-black/20 px-4 py-4">
-                <div className="flex h-16 w-16 items-center justify-center overflow-hidden rounded-2xl border border-teal-200 dark:border-[#4ff0d7]/25 bg-teal-50 dark:bg-[#4ff0d7]/10 text-2xl font-display text-teal-600 dark:text-[#4ff0d7]">
-                  {profileForm.imageUrl ? (
-                    <img src={profileForm.imageUrl} alt="Profile" className="h-full w-full object-cover" />
+              <div className="flex items-center gap-4 rounded-3xl border border-slate-200 dark:border-white/10 bg-slate-50/90 dark:bg-black/20 px-4 py-4">
+                <div className="flex h-20 w-20 items-center justify-center overflow-hidden rounded-2xl border border-teal-200 dark:border-[#4ff0d7]/20 bg-teal-50 dark:bg-[#4ff0d7]/10 text-2xl font-display text-teal-600 dark:text-[#4ff0d7]">
+                  {user?.imageUrl ? (
+                    <img
+                      src={user.imageUrl}
+                      alt="Profile"
+                      className="h-full w-full object-cover"
+                    />
                   ) : (
-                    <span>{avatarLabel}</span>
+                    <span>{(user?.name || user?.email || "A").trim().charAt(0).toUpperCase()}</span>
                   )}
                 </div>
                 <div>
-                  <div className="font-display text-lg text-slate-900 dark:text-[#f4f8f9]">{user?.name || "Security operator"}</div>
-                  <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-500 dark:text-[#8fa3ad]">
-                    <span className="inline-flex items-center gap-1 rounded-full border border-slate-200 dark:border-white/10 px-2.5 py-1">
-                      <Shield className="h-3 w-3 text-teal-600 dark:text-[#4ff0d7]" />
-                      {user?.isVerified ? "Verified" : "Pending"}
-                    </span>
-                    <span className="inline-flex items-center gap-1 rounded-full border border-slate-200 dark:border-white/10 px-2.5 py-1">
-                      <BadgeCheck className="h-3 w-3 text-amber-600 dark:text-[#ffb454]" />
-                      {user?.authProvider || "LOCAL"}
-                    </span>
+                  <div className="font-mono text-[10px] uppercase tracking-[0.25em] text-slate-400 dark:text-[#8fa3ad]">Picture</div>
+                  <div className="mt-1 font-display text-lg text-slate-900 dark:text-[#e8f1f2]">
+                    {user?.imageUrl ? "Profile photo" : "Initial avatar"}
                   </div>
                 </div>
               </div>
             </div>
 
-            {/* Upload preview area with dynamic background */}
-            <div className="mt-6 rounded-3xl border border-dashed border-slate-200 dark:border-white/10 bg-slate-50/50 dark:bg-black/15 p-5">
-              <div className="flex items-center gap-4">
-                <div className="flex h-20 w-20 items-center justify-center overflow-hidden rounded-2xl border border-slate-200 dark:border-white/10 bg-slate-100 dark:bg-white/5">
-                  {profileForm.imageUrl ? (
-                    <img src={profileForm.imageUrl} alt="Profile" className="h-full w-full object-cover" />
-                  ) : (
-                    <UserRound className="h-10 w-10 text-teal-600/80 dark:text-[#4ff0d7]/80" />
-                  )}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex flex-wrap items-center gap-3">
-                    <button
-                      type="button"
-                      onClick={() => fileInputRef.current?.click()}
-                      className="inline-flex items-center gap-2 rounded-full bg-teal-600 hover:bg-teal-500 dark:bg-[#4ff0d7] px-4 py-2.5 font-mono text-xs font-semibold uppercase tracking-widest text-white dark:text-[#04141c] transition-colors dark:hover:bg-[#7bf5e1]"
-                    >
-                      <Camera className="h-3.5 w-3.5" />
-                      Change photo
-                    </button>
-                    {uploadingAvatar ? <Loader2 className="h-4 w-4 animate-spin text-teal-600 dark:text-[#4ff0d7]" /> : null}
-                  </div>
-                  <p className="mt-2 text-sm leading-6 text-slate-500 dark:text-[#8fa3ad]">
-                    Use a clear profile image to make the account easier to recognize across the app. Uploading a new file will update the preview here.
-                  </p>
+            <div className="mt-6 grid gap-4 md:grid-cols-2">
+              <div className="rounded-2xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-black/25 p-4">
+                <div className="font-mono text-[10px] uppercase tracking-[0.25em] text-slate-400 dark:text-[#8fa3ad]">Name</div>
+                <div className="mt-2 flex items-center gap-3 text-slate-900 dark:text-[#e8f1f2]">
+                  <UserRound className="h-4 w-4 text-teal-600 dark:text-[#4ff0d7]" />
+                  <span className="font-display text-lg">{user?.name || "Security operator"}</span>
                 </div>
               </div>
-              <input ref={fileInputRef} type="file" accept="image/*" onChange={handleAvatarSelect} className="hidden" />
+
+              <div className="rounded-2xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-black/25 p-4">
+                <div className="font-mono text-[10px] uppercase tracking-[0.25em] text-slate-400 dark:text-[#8fa3ad]">Email</div>
+                <div className="mt-2 flex items-center gap-3 text-slate-900 dark:text-[#e8f1f2]">
+                  <Mail className="h-4 w-4 text-teal-600 dark:text-[#4ff0d7]" />
+                  <span className="font-display text-lg break-all">{user?.email || "-"}</span>
+                </div>
+              </div>
             </div>
-          </section>
 
-          <div className="grid gap-6 lg:grid-cols-2">
-            <section className="rounded-[32px] border border-slate-200/80 dark:border-white/10 bg-white/70 dark:bg-white/[0.04] p-6 shadow-xl shadow-slate-100/50 dark:shadow-black/20 backdrop-blur-xl lg:p-7">
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <div className="font-mono text-[10px] uppercase tracking-[0.35em] text-teal-600 dark:text-[#4ff0d7]">Profile details</div>
-                  <h2 className="mt-3 font-display text-2xl text-slate-900 dark:text-[#f4f8f9]">Identity</h2>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    const original = buildProfileForm(user);
-                    setProfileForm(original);
-                    updateLocalTheme(original.themePreference);
-                  }}
-                  className="rounded-full border border-slate-200 dark:border-white/10 bg-slate-100 dark:bg-white/5 px-4 py-2 font-mono text-[11px] uppercase tracking-widest text-slate-500 dark:text-[#8fa3ad] transition-colors hover:bg-slate-200 dark:hover:bg-white/10 hover:text-slate-900 dark:hover:text-[#e8f1f2]"
-                >
-                  Reset
-                </button>
-              </div>
+            <div className="mt-6 flex flex-wrap items-center gap-3">
+              <button
+                type="button"
+                onClick={() => setShowPasswordForm((current) => !current)}
+                className="inline-flex items-center gap-2 rounded-full bg-teal-600 hover:bg-teal-500 dark:bg-[#4ff0d7] px-5 py-3 font-mono text-xs font-semibold uppercase tracking-[0.3em] text-white dark:text-[#04141c] transition-colors dark:hover:bg-[#7bf5e1]"
+              >
+                <Lock className="h-4 w-4" />
+                Change password
+              </button>
+            </div>
 
-              <form onSubmit={handleProfileSave} className="mt-6 space-y-5">
-                <Field label="Display name" icon={UserRound} helper="Shown across dashboards and notifications.">
-                  <input
-                    value={profileForm.name}
-                    onChange={updateProfileField("name")}
-                    className="w-full rounded-2xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-black/25 px-4 py-3 text-sm text-slate-800 dark:text-[#e8f1f2] placeholder:text-slate-400 dark:placeholder:text-[#5c7078] outline-none transition-colors focus:border-teal-500 dark:focus:border-[#4ff0d7]/40 focus:ring-2 focus:ring-teal-100 dark:focus:ring-[#4ff0d7]/10"
-                    placeholder="Security operator"
-                  />
-                </Field>
-
-                <Field label="Email address" icon={Mail} helper="Used for sign-in and recovery.">
-                  <input
-                    type="email"
-                    value={profileForm.email}
-                    onChange={updateProfileField("email")}
-                    className="w-full rounded-2xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-black/25 px-4 py-3 text-sm text-slate-800 dark:text-[#e8f1f2] placeholder:text-slate-400 dark:placeholder:text-[#5c7078] outline-none transition-colors focus:border-teal-500 dark:focus:border-[#4ff0d7]/40 focus:ring-2 focus:ring-teal-100 dark:focus:ring-[#4ff0d7]/10"
-                    placeholder="security@geosecure.ai"
-                  />
-                </Field>
-
-                <Field label="Theme preference" icon={Palette} helper="Stored on your account for future theme settings.">
-                  <div className="grid grid-cols-3 gap-2 rounded-2xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-black/25 p-2">
-                    {themeOptions.map((themeVal) => {
-                      const active = profileForm.themePreference === themeVal;
-                      return (
-                        <button
-                          key={themeVal}
-                          type="button"
-                          onClick={() => {
-                            setProfileForm((current) => ({ ...current, themePreference: themeVal }));
-                            updateLocalTheme(themeVal);
-                          }}
-                          className={`rounded-xl px-3 py-2 font-mono text-xs uppercase tracking-widest transition-colors ${
-                            active
-                              ? "bg-teal-600 text-white dark:bg-[#4ff0d7] dark:text-[#04141c]"
-                              : "text-slate-500 dark:text-[#8fa3ad] hover:bg-slate-200 dark:hover:bg-white/8 hover:text-slate-900 dark:hover:text-[#e8f1f2]"
-                          }`}
-                        >
-                          {themeVal}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </Field>
-
-                <div className="flex items-center justify-end gap-3 pt-2">
-                  <button
-                    type="submit"
-                    disabled={savingProfile}
-                    className="inline-flex min-w-40 items-center justify-center gap-2 rounded-full bg-teal-600 hover:bg-teal-500 dark:bg-[#4ff0d7] px-6 py-3 font-mono text-xs font-semibold uppercase tracking-[0.3em] text-white dark:text-[#04141c] transition-colors dark:hover:bg-[#7bf5e1] disabled:cursor-not-allowed disabled:opacity-70"
-                  >
-                    {savingProfile ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-                    Save changes
-                  </button>
-                </div>
-              </form>
-            </section>
-
-            <section className="rounded-[32px] border border-slate-200/80 dark:border-white/10 bg-white/70 dark:bg-white/[0.04] p-6 shadow-xl shadow-slate-100/50 dark:shadow-black/20 backdrop-blur-xl lg:p-7">
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <div className="font-mono text-[10px] uppercase tracking-[0.35em] text-amber-600 dark:text-[#ffb454]">Security</div>
-                  <h2 className="mt-3 font-display text-2xl text-slate-900 dark:text-[#f4f8f9]">Password</h2>
-                </div>
-                <div className="inline-flex items-center gap-2 rounded-full border border-slate-200 dark:border-white/10 bg-slate-100 dark:bg-black/20 px-3 py-2 font-mono text-[10px] uppercase tracking-[0.3em] text-slate-500 dark:text-[#8fa3ad]">
-                  <Lock className="h-3.5 w-3.5 text-amber-600 dark:text-[#ffb454]" />
-                  {isLocalAuth ? "Local account" : "External account"}
-                </div>
-              </div>
-
-              <form onSubmit={handlePasswordSave} className="mt-6 space-y-5">
-                {isLocalAuth ? (
-                  <Field label="Current password" icon={Lock}>
+            {showPasswordForm && (
+              <form onSubmit={handlePasswordSave} className="mt-6 space-y-4 rounded-3xl border border-slate-200 dark:border-white/10 bg-slate-50/70 dark:bg-black/20 p-5">
+                <div className="font-mono text-[10px] uppercase tracking-[0.35em] text-amber-600 dark:text-[#ffb454]">Update password</div>
+                <div className="grid gap-4 md:grid-cols-3">
+                  <label className="block">
+                    <span className="mb-2 block font-mono text-[11px] uppercase tracking-[0.25em] text-slate-500 dark:text-[#8fa3ad]">Current password</span>
                     <input
                       type="password"
                       value={passwordForm.currentPassword}
                       onChange={updatePasswordField("currentPassword")}
-                      className="w-full rounded-2xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-black/25 px-4 py-3 text-sm text-slate-800 dark:text-[#e8f1f2] placeholder:text-slate-400 dark:placeholder:text-[#5c7078] outline-none transition-colors focus:border-amber-500 dark:focus:border-[#ffb454]/40 focus:ring-2 focus:ring-amber-100 dark:focus:ring-[#ffb454]/10"
-                      placeholder="Enter current password"
+                      className="w-full rounded-2xl border border-slate-200 dark:border-white/10 bg-white dark:bg-black/25 px-4 py-3 text-sm text-slate-800 dark:text-[#e8f1f2] outline-none transition-colors focus:border-amber-500 dark:focus:border-[#ffb454]/40"
+                      placeholder="Current password"
                     />
-                  </Field>
-                ) : (
-                  <div className="rounded-2xl border border-slate-200 dark:border-white/10 bg-slate-100 dark:bg-black/20 p-4 text-sm leading-6 text-slate-500 dark:text-[#8fa3ad]">
-                    Password changes are managed by your external identity provider.
-                  </div>
-                )}
+                  </label>
 
-                <Field label="New password" icon={Shield}>
-                  <input
-                    type="password"
-                    value={passwordForm.newPassword}
-                    onChange={updatePasswordField("newPassword")}
-                    className="w-full rounded-2xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-black/25 px-4 py-3 text-sm text-slate-800 dark:text-[#e8f1f2] placeholder:text-slate-400 dark:placeholder:text-[#5c7078] outline-none transition-colors focus:border-amber-500 dark:focus:border-[#ffb454]/40 focus:ring-2 focus:ring-amber-100 dark:focus:ring-[#ffb454]/10"
-                    placeholder="At least 8 characters"
-                  />
-                </Field>
+                  <label className="block">
+                    <span className="mb-2 block font-mono text-[11px] uppercase tracking-[0.25em] text-slate-500 dark:text-[#8fa3ad]">New password</span>
+                    <input
+                      type="password"
+                      value={passwordForm.newPassword}
+                      onChange={updatePasswordField("newPassword")}
+                      className="w-full rounded-2xl border border-slate-200 dark:border-white/10 bg-white dark:bg-black/25 px-4 py-3 text-sm text-slate-800 dark:text-[#e8f1f2] outline-none transition-colors focus:border-amber-500 dark:focus:border-[#ffb454]/40"
+                      placeholder="New password"
+                    />
+                  </label>
 
-                <Field label="Confirm new password" icon={Shield}>
-                  <input
-                    type="password"
-                    value={passwordForm.confirmNewPassword}
-                    onChange={updatePasswordField("confirmNewPassword")}
-                    className="w-full rounded-2xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-black/25 px-4 py-3 text-sm text-slate-800 dark:text-[#e8f1f2] placeholder:text-slate-400 dark:placeholder:text-[#5c7078] outline-none transition-colors focus:border-amber-500 dark:focus:border-[#ffb454]/40 focus:ring-2 focus:ring-amber-100 dark:focus:ring-[#ffb454]/10"
-                    placeholder="Repeat new password"
-                  />
-                </Field>
+                  <label className="block">
+                    <span className="mb-2 block font-mono text-[11px] uppercase tracking-[0.25em] text-slate-500 dark:text-[#8fa3ad]">Confirm password</span>
+                    <input
+                      type="password"
+                      value={passwordForm.confirmNewPassword}
+                      onChange={updatePasswordField("confirmNewPassword")}
+                      className="w-full rounded-2xl border border-slate-200 dark:border-white/10 bg-white dark:bg-black/25 px-4 py-3 text-sm text-slate-800 dark:text-[#e8f1f2] outline-none transition-colors focus:border-amber-500 dark:focus:border-[#ffb454]/40"
+                      placeholder="Confirm password"
+                    />
+                  </label>
+                </div>
 
-                <div className="flex items-center justify-end gap-3 pt-2">
+                <div className="flex flex-wrap items-center justify-end gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setShowPasswordForm(false)}
+                    className="rounded-full border border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 px-5 py-3 font-mono text-xs uppercase tracking-[0.25em] text-slate-500 dark:text-[#8fa3ad] transition-colors hover:bg-slate-100 dark:hover:bg-white/10 hover:text-slate-900 dark:hover:text-[#e8f1f2]"
+                  >
+                    Cancel
+                  </button>
                   <button
                     type="submit"
                     disabled={savingPassword}
-                    className="inline-flex min-w-40 items-center justify-center gap-2 rounded-full border border-amber-500/35 bg-amber-50 dark:bg-[#ffb454]/10 px-6 py-3 font-mono text-xs font-semibold uppercase tracking-[0.3em] text-amber-700 dark:text-[#ffcf93] transition-colors hover:bg-amber-100 dark:hover:bg-[#ffb454]/18 disabled:cursor-not-allowed disabled:opacity-70"
+                    className="inline-flex items-center gap-2 rounded-full border border-amber-500/35 bg-amber-50 dark:bg-[#ffb454]/10 px-5 py-3 font-mono text-xs font-semibold uppercase tracking-[0.3em] text-amber-700 dark:text-[#ffcf93] transition-colors hover:bg-amber-100 dark:hover:bg-[#ffb454]/18 disabled:cursor-not-allowed disabled:opacity-70"
                   >
                     {savingPassword ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-                    Update password
+                    Save password
                   </button>
                 </div>
               </form>
-            </section>
-
-            <section className="rounded-[32px] border border-red-200 dark:border-red-500/20 bg-red-50/80 dark:bg-red-500/8 p-6 shadow-xl shadow-red-100/30 dark:shadow-black/20 backdrop-blur-xl lg:p-7 lg:col-span-2">
-              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                  <div className="font-mono text-[10px] uppercase tracking-[0.35em] text-red-500 dark:text-red-300">Danger zone</div>
-                  <h2 className="mt-3 font-display text-2xl text-slate-900 dark:text-[#f4f8f9]">Delete account</h2>
-                  <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600 dark:text-[#c9b7b7]">
-                    This permanently removes your profile and cannot be undone.
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={handleDeleteAccount}
-                  disabled={deletingAccount}
-                  className="inline-flex items-center justify-center gap-2 rounded-full border border-red-300 dark:border-red-500/30 bg-red-100 dark:bg-red-500/15 px-6 py-3 font-mono text-xs font-semibold uppercase tracking-[0.3em] text-red-700 dark:text-red-200 transition-colors hover:bg-red-200 dark:hover:bg-red-500/25 disabled:cursor-not-allowed disabled:opacity-70"
-                >
-                  {deletingAccount ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
-                  Delete account
-                </button>
-              </div>
-            </section>
-          </div>
+            )}
+          </section>
         </div>
       </div>
     </div>
