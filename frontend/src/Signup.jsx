@@ -139,8 +139,8 @@ const Signup = ({ onSignupSuccess }) => {
         onSignupSuccess(data);
       }
 
-      // Redirect to home
-      navigate("/");
+      // Redirect to dashboard after successful signup
+      navigate("/dashboard");
     } catch (err) {
       setError(err.message);
     } finally {

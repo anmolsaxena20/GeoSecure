@@ -69,8 +69,8 @@ const Login = ({ onLoginSuccess }) => {
         onLoginSuccess(data);
       }
 
-      // Redirect to home
-      navigate("/");
+      // Redirect to dashboard after successful login
+      navigate("/dashboard");
     } catch (err) {
       setError(err.message);
     } finally {

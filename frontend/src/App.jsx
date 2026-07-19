@@ -6,7 +6,9 @@ import GeoSecureHome from './GeoSecureHome.jsx'
 import Login from './Login.jsx'
 import Signup from './Signup.jsx'
 import Profile from './Profile.jsx'
+import DigitalTwin from './DigitalTwin.jsx'
 import { API_ENDPOINTS } from './config/api.js'
+import Dashboard from './Dashboard.jsx'
 
 export default function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
@@ -88,22 +90,19 @@ export default function App() {
           path="/" 
           element={<GeoSecureHome onLogout={handleLogout} isAuthenticated={isAuthenticated} />} 
         />
-        <Route
-          path="/profile"
-          element={isAuthenticated ? <Profile onLogout={handleLogout} /> : <Navigate to="/login" />}
-        />
-        <Route
-          path="/dashboard"
-          element={isAuthenticated ? <Navigate to="/profile" /> : <Navigate to="/login" />}
-        />
         <Route 
           path="/login" 
-          element={isAuthenticated ? <Navigate to="/" /> : <Login onLoginSuccess={handleLoginSuccess} />} 
+          element={isAuthenticated ? <Navigate to="/dashboard" /> : <Login onLoginSuccess={handleLoginSuccess} />} 
         />
         <Route 
           path="/signup" 
-          element={isAuthenticated ? <Navigate to="/" /> : <Signup onSignupSuccess={handleLoginSuccess} />} 
+          element={isAuthenticated ? <Navigate to="/dashboard" /> : <Signup onSignupSuccess={handleLoginSuccess} />} 
         />
+        <Route 
+          path="/dashboard" 
+          element={isAuthenticated ? <Dashboard onLogout={handleLogout} /> : <Navigate to="/login" />} 
+        />
+        <Route path="/digitaltwin" element={<DigitalTwin isAuthenticated={isAuthenticated} />} />
         <Route path="*" element={<Navigate to="/" />} />
       </Routes>
     </Router>
