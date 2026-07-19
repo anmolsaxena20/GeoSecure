@@ -619,6 +619,12 @@ export default function GeoSecureHome({ isAuthenticated, onLogout }) {
                   Disruption Scenario
                 </Link>
                 <Link
+                  to="/reserve-optimisation"
+                  className="transition-colors hover:text-slate-900 dark:hover:text-[#e8f1f2]"
+                >
+                  Reserve Optimisation
+                </Link>
+                <Link
                   to="/procurement-orchestrator"
                   className="transition-colors hover:text-slate-900 dark:hover:text-[#e8f1f2]"
                 >
@@ -715,6 +721,12 @@ export default function GeoSecureHome({ isAuthenticated, onLogout }) {
                     className="rounded-sm border border-[#ffb454]/30 bg-[#ffb454]/10 px-6 py-3 font-mono text-xs font-semibold uppercase tracking-widest text-[#ffb454] transition-colors hover:bg-[#ffb454]/20 dark:border-[#ffb454]/30 dark:bg-[#ffb454]/10 dark:text-[#ffb454] dark:hover:bg-[#ffb454]/20"
                   >
                     Disruption Scenario
+                  </Link>
+                  <Link
+                    to="/reserve-optimisation"
+                    className="rounded-sm border border-[#a78bfa]/30 bg-[#a78bfa]/10 px-6 py-3 font-mono text-xs font-semibold uppercase tracking-widest text-[#a78bfa] transition-colors hover:bg-[#a78bfa]/20 dark:border-[#a78bfa]/30 dark:bg-[#a78bfa]/10 dark:text-[#a78bfa] dark:hover:bg-[#a78bfa]/20"
+                  >
+                    Reserve Optimisation
                   </Link>
                   <Link
                     to="/procurement-orchestrator"
