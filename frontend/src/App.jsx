@@ -6,6 +6,7 @@ import GeoSecureHome from './GeoSecureHome.jsx'
 import Login from './Login.jsx'
 import Signup from './Signup.jsx'
 import Profile from './Profile.jsx'
+import DigitalTwin from './DigitalTwin.jsx'
 import { API_ENDPOINTS } from './config/api.js'
 import Dashboard from './Dashboard.jsx'
 
@@ -97,6 +98,11 @@ export default function App() {
           path="/signup" 
           element={isAuthenticated ? <Navigate to="/dashboard" /> : <Signup onSignupSuccess={handleLoginSuccess} />} 
         />
+        <Route 
+          path="/dashboard" 
+          element={isAuthenticated ? <Dashboard onLogout={handleLogout} /> : <Navigate to="/login" />} 
+        />
+        <Route path="/digitaltwin" element={<DigitalTwin isAuthenticated={isAuthenticated} />} />
         <Route path="*" element={<Navigate to="/" />} />
       </Routes>
     </Router>
