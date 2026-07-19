@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>India Energy Network Digital Twin - Geospatial Simulator</title>
+  
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+  
+  <!-- Font Awesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  
+  <!-- Custom CSS stylesheet -->
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+  <!-- App Header -->
+  <header class="app-header">
+    <div class="header-logo">
+      <i class="fa-solid fa-circle-nodes logo-icon"></i>
+      <div class="logo-text">
+        <h1>GeoSecure Digital Twin</h1>
+        <span>India Energy Supply Chain Geospatial Simulator</span>
+      </div>
+    </div>
+    
+    <div class="header-actions">
+      <!-- Scenario Selector -->
+      <div class="preset-selector">
+        <label for="scenarioPreset"><i class="fa-solid fa-wand-magic-sparkles"></i> Preset:</label>
+        <select id="scenarioPreset">
+          <option value="normal">Standard Operations</option>
+          <option value="cyclone">Gujarat Cyclone Impact</option>
+          <option value="pipeline_leak">Mumbai High Pipeline Leak</option>
+          <option value="floods">Assam Regional Floods</option>
+          <option value="geopolitical">Middle East Maritime Disruption</option>
+        </select>
+      </div>
+
+      <button id="resetSimBtn" class="btn btn-secondary">
+        <i class="fa-solid fa-rotate-left"></i> Reset Simulation
+      </button>
+
+      <div class="system-status active">
+        <span class="status-indicator"></span>
+        <span class="status-text">SYSTEM SIMULATION ONLINE</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Grid Dashboard -->
+  <div class="dashboard-grid">
+    
+    <!-- Left Column: Map & Ticker -->
+    <div class="map-section">
+      <!-- KPI Top Bar -->
+      <div class="kpi-container">
+        <div class="kpi-card" id="kpi-risk">
+          <span class="kpi-label">Overall Network Risk</span>
+          <div class="kpi-value">--<span class="kpi-unit">/100</span></div>
+          <span class="kpi-sub">Level: --</span>
+        </div>
+        <div class="kpi-card" id="kpi-capacity">
+          <span class="kpi-label">Refinery Capacity Utilization</span>
+          <div class="kpi-value">--<span class="kpi-unit">%</span></div>
+          <span class="kpi-sub">Active: -- bbl/d</span>
+        </div>
+        <div class="kpi-card" id="kpi-cover">
+          <span class="kpi-label">Terminal Supply Sufficiency</span>
+          <div class="kpi-value">--<span class="kpi-unit">days</span></div>
+          <span class="kpi-sub">Average reserve cover</span>
+        </div>
+        <div class="kpi-card" id="kpi-price">
+          <span class="kpi-label">Brent Crude Benchmark</span>
+          <div class="kpi-value">$--<span class="kpi-unit">/bbl</span></div>
+          <span class="kpi-sub">Forex: -- USD/INR</span>
+        </div>
+      </div>
+
+      <!-- Leaflet Map Container -->
+      <div id="map-container" class="glass-panel"></div>
+
+      <!-- Disruption Alert Ticker -->
+      <div class="news-ticker glass-panel">
+        <div class="ticker-label"><i class="fa-solid fa-triangle-exclamation"></i> Threat Alert:</div>
+        <div class="ticker-content" id="ticker-messages">
+          <span>Retrieving threat feed and global news...</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right Column: Command Center Tabs -->
+    <div class="command-section glass-panel">
+      <!-- Tabs Headers -->
+      <div class="tabs-header">
+        <button class="tab-btn active" data-tab="simulation-tab">
+          <i class="fa-solid fa-sliders"></i> Simulator
+        </button>
+        <button class="tab-btn" data-tab="ai-agents-tab">
+          <i class="fa-solid fa-brain"></i> AI Agents
+        </button>
+        <button class="tab-btn" data-tab="copilot-tab">
+          <i class="fa-solid fa-comments"></i> Copilot Chat
+        </button>
+      </div>
+
+      <!-- Tab Content: Simulator Controls -->
+      <div id="simulation-tab" class="tab-content active">
+        <div class="tab-section">
+          <h3><i class="fa-solid fa-circle-info"></i> Interactive Control</h3>
+          <p class="section-desc">Click any marker on the map to modify its output capacity directly, or select a preset from the header to simulate full regional disruptions.</p>
+        </div>
+
+        <div id="selected-node-panel" class="node-panel empty">
+          <div class="empty-state">
+            <i class="fa-solid fa-location-crosshairs"></i>
+            <p>Select a Node on the map to view details and execute simulated stresses.</p>
+          </div>
+          
+          <div class="node-details-content hidden">
+            <div class="node-header-info">
+              <span id="node-badge" class="badge">Wellhead</span>
+              <h4 id="node-title">Mumbai High Offshore</h4>
+            </div>
+            
+            <div class="detail-row">
+              <span>Operational Health:</span>
+              <strong id="node-health-txt">100%</strong>
+            </div>
+            <div class="slider-container">
+              <input type="range" id="node-health-slider" min="0" max="100" value="100">
+              <div class="slider-labels">
+                <span>0% (Disrupted)</span>
+                <span>100% (Healthy)</span>
+              </div>
+            </div>
+
+            <div class="detail-row">
+              <span id="node-rate-label">Production Capacity:</span>
+              <strong id="node-rate-txt">350,000 bbl/d</strong>
+            </div>
+
+            <div class="disruption-status-field">
+              <label for="node-disruption-desc">Active Incident Description:</label>
+              <textarea id="node-disruption-desc" placeholder="e.g. Cyclone damage to deepsea drilling platform..."></textarea>
+            </div>
+
+            <div class="node-actions-row">
+              <button id="applyNodeChangesBtn" class="btn btn-primary">Apply Stress</button>
+              <button id="clearDisruptionBtn" class="btn btn-secondary">Clear Disruption</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- System Flow Balance Summary -->
+        <div class="system-summary">
+          <h3><i class="fa-solid fa-chart-simple"></i> Asset Operating Levels</h3>
+          
+          <!-- Chart Container -->
+          <div class="chart-wrapper">
+            <canvas id="refineryChart"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tab Content: AI Agents -->
+      <div id="ai-agents-tab" class="tab-content">
+        <div class="tab-section">
+          <h3><i class="fa-solid fa-robot"></i> Multi-Agent Orchestration</h3>
+          <p class="section-desc">Trigger background analysis cycles. These agents compile news feeds, weather data, and market metrics directly into the database.</p>
+        </div>
+
+        <div class="agent-trigger-cards">
+          <!-- Disruption Risk Agent Card -->
+          <div class="agent-card">
+            <div class="agent-card-header">
+              <i class="fa-solid fa-shield-halved agent-icon disruption-agent"></i>
+              <div>
+                <h4>Disruption Risk Agent</h4>
+                <span>Scans ports, weather & trade corridors</span>
+              </div>
+            </div>
+            <p>Monitors global trade lanes (Strait of Hormuz, Singapore, etc.) and updates shipping risk score probabilities.</p>
+            <button id="runDisruptionAgentBtn" class="btn btn-agent">
+              <i class="fa-solid fa-play"></i> Run Disruption Agent
+            </button>
+          </div>
+
+          <!-- Economies Agent Card -->
+          <div class="agent-card">
+            <div class="agent-card-header">
+              <i class="fa-solid fa-chart-line agent-icon economies-agent"></i>
+              <div>
+                <h4>Supply Chain Economies Agent</h4>
+                <span>Analyzes GDP, inflation & logistics performance</span>
+              </div>
+            </div>
+            <p>Calculates macro-economic impacts of energy price shocks and updates the risk events ledger.</p>
+            <button id="runEconomiesAgentBtn" class="btn btn-agent">
+              <i class="fa-solid fa-play"></i> Run Economies Agent
+            </button>
+          </div>
+        </div>
+
+        <!-- Risks Table -->
+        <div class="scores-table-container">
+          <h4>Active Corridor Risk Probabilities</h4>
+          <table class="scores-table">
+            <thead>
+              <tr>
+                <th>Corridor Name</th>
+                <th>Probability</th>
+                <th>Risk Level</th>
+              </tr>
+            </thead>
+            <tbody id="corridor-scores-body">
+              <tr><td colspan="3" class="text-center">Loading risk registry...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Tab Content: Copilot Chat -->
+      <div id="copilot-tab" class="tab-content">
+        <div class="tab-section">
+          <h3><i class="fa-solid fa-user-gear"></i> Supply Chain AI Copilot</h3>
+          <p class="section-desc">Consult the copilot regarding current stresses. The AI has access to the database, market feeds, and receives the exact digital twin map state to evaluate alternatives.</p>
+        </div>
+
+        <div class="chat-container">
+          <div class="chat-messages-box" id="chat-messages-container">
+            <div class="message assistant">
+              <div class="message-sender"><i class="fa-solid fa-robot"></i> Copilot</div>
+              <div class="message-text">Greetings! I am the GeoSecure Supply Chain Copilot. I have loaded India's energy network layout. If you disrupt any refinery or pipeline, let me know, and I will recommend rerouting or strategic reserve mitigation options.</div>
+            </div>
+          </div>
+          
+          <div class="chat-input-box">
+            <input type="text" id="chat-input-field" placeholder="Ask about alternative routes, refinery status, or risk mitigation...">
+            <button id="sendChatBtn"><i class="fa-solid fa-paper-plane"></i></button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Leaflet Javascript -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+  
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <!-- Client Script -->
+  <script src="client.js"></script>
+</body>
+</html>

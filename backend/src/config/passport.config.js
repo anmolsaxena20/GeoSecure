@@ -46,7 +46,7 @@ if (googleOAuthEnabled) {
           }
 
           const byEmail = await prisma.user.findUnique({
-            where: { email },
+            where: { email: email },
           });
 
           if (byEmail) {

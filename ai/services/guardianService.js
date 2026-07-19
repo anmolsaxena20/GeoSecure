@@ -7,7 +7,7 @@ export async function fetchGuardianNews() {
             params: {
                 q: "supply chain OR logistics OR shipping OR sanctions",
                 "show-fields": "trailText",
-                "page-size": 5,
+                "page-size": 2,
                 "api-key": process.env.GUARDIAN_API_KEY
             }
         }

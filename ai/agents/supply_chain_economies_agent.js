@@ -109,6 +109,7 @@ const SCHEMA_TEMPLATE = {
 };
 
 // Helper to keep only the latest data points from Alpha Vantage time-series to prevent token limit issues.
+// Only 1 entry is retained to stay well within Groq's free-tier TPM limits.
 function trimCommodityData(rawCommodities) {
   const trimmed = {};
   for (const [key, val] of Object.entries(rawCommodities || {})) {
@@ -116,13 +117,42 @@ function trimCommodityData(rawCommodities) {
       trimmed[key] = {
         name: val.name,
         unit: val.unit,
-        data: val.data.slice(0, 2)
+        data: val.data.slice(0, 1)   // keep only the single most-recent point
       };
     } else {
       trimmed[key] = val;
     }
   }
   return trimmed;
+}
+
+// Retry wrapper with exponential backoff — handles Groq 429 (rate-limit) and
+// transient 5xx / network errors that have historically caused agent failures.
+async function withRetry(fn, { maxAttempts = 4, baseDelayMs = 30000 } = {}) {
+  let lastError;
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      return await fn();
+    } catch (err) {
+      lastError = err;
+      const msg = err?.message || "";
+      // Only retry on rate-limit (429) or server-side (5xx) errors
+      const isRetryable =
+        msg.includes("429") ||
+        msg.includes("rate_limit_exceeded") ||
+        msg.includes("500") ||
+        msg.includes("502") ||
+        msg.includes("503") ||
+        msg.includes("Connection error");
+      if (!isRetryable || attempt === maxAttempts) throw err;
+      const waitMs = baseDelayMs * Math.pow(2, attempt - 1); // 30s, 60s, 120s …
+      console.warn(
+        `[retry] Attempt ${attempt} failed (${msg.slice(0, 120)}). Retrying in ${waitMs / 1000}s…`
+      );
+      await new Promise((r) => setTimeout(r, waitMs));
+    }
+  }
+  throw lastError;
 }
 
 // --- TOOL DEFINITIONS ---
@@ -249,11 +279,13 @@ const tools = [fetchNewsTool, fetchWorldBankTool, fetchAlphaVantageTool, fetchUN
 // --- GRAPH SETUP ---
 
 function createGraphApp() {
+  // llama-3.3-70b-versatile: ~30 000 TPM on Groq free tier (vs 6 000 for
+  // llama-3.1-8b-instant), and a 128 K context window — avoids 413 errors.
   const llm = new ChatGroq({
     apiKey: process.env.GROQ_API_KEY,
-    model: process.env.GROQ_MODEL || "llama-3.1-8b-instant",
+    model: process.env.GROQ_MODEL || "llama-3.3-70b-versatile",
     temperature: 0,
-    maxRetries: 2,
+    maxRetries: 3,
   }).bindTools(tools);
 
   const toolNode = new ToolNode(tools);
@@ -323,9 +355,9 @@ function getFinalModelText(result) {
 async function coerceStructuredJson(rawText) {
   const formatter = new ChatGroq({
     apiKey: process.env.GROQ_API_KEY,
-    model: process.env.GROQ_MODEL || "llama-3.1-8b-instant",
+    model: process.env.GROQ_MODEL || "llama-3.3-70b-versatile",
     temperature: 0,
-    maxRetries: 2,
+    maxRetries: 3,
   });
 
   const repairPrompt = [
@@ -366,33 +398,40 @@ class SupplyChainEconomiesAgent {
     console.log(`[agent] Cycle started at ${startTime}`);
 
     try {
-      const result = await this.app.invoke({
-        messages: [
-          new HumanMessage([
-            "You are a supply chain and logistics intelligence agent for end users in trade-driven economies.",
-            "Use the tools at your disposal to gather the necessary data.",
-            "First, fetch news from the Guardian using 'fetch_news'.",
-            "Second, fetch macroeconomic indicators using 'fetch_world_bank'.",
-            "Third, fetch real-time market indicators using 'fetch_alpha_vantage'.",
-            "Fourth, fetch commercial trade statistics from UN Comtrade using 'fetch_un_comtrade'.",
-            "Fifth, fetch current weather for global chokepoints using 'fetch_chokepoint_weather'.",
-            "Sixth, fetch active natural disasters from NASA EONET using 'fetch_natural_disasters'.",
-            "",
-            "Correlate the news events with the commodity prices, stocks, forex rates, World Bank indicators, UN Comtrade commercial trade flows, chokepoint weather conditions, and active natural disaster events to construct a structured analysis.",
-            "Explain how the market trends, trade statistics, weather delays, and disaster news reinforce or diminish the risks identified in the news.",
-            "",
-            "Return ONLY a valid JSON payload matching this exact schema layout:",
-            JSON.stringify(SCHEMA_TEMPLATE, null, 2),
-            "",
-            "Constraints:",
-            "- event_type must be exactly one of: PORT_DISRUPTION, LABOR_STRIKE, SHIPPING_DISRUPTION, TRADE_POLICY_CHANGE, SANCTIONS, EXPORT_RESTRICTION, IMPORT_RESTRICTION, ENERGY_SHOCK, CYBER_ATTACK, NATURAL_DISASTER, INFRASTRUCTURE_FAILURE, GEOPOLITICAL_EVENT, OTHER",
-            "- risk_level must be exactly one of: LOW, MEDIUM, HIGH, CRITICAL",
-            "- transport_modes elements must be subset of: Ocean, Air, Rail, Road, Pipeline",
-            "- why_it_matters must be concise and action-oriented",
-            "- Return ONLY valid JSON. No conversational prologues, epilogues, or explanation wrappers."
-          ].join("\n")),
-        ],
-      });
+      // Wrap the invoke call in the retry helper to handle Groq 429 / 5xx errors.
+      const result = await withRetry(() =>
+        this.app.invoke({
+          messages: [
+            new HumanMessage([
+              "You are a supply chain and logistics intelligence agent for end users in trade-driven economies.",
+              "Use the tools at your disposal to gather the necessary data.",
+              "First, fetch news from the Guardian using 'fetch_news'.",
+              "Second, fetch macroeconomic indicators using 'fetch_world_bank'.",
+              "Third, fetch real-time market indicators using 'fetch_alpha_vantage'.",
+              "Fourth, fetch commercial trade statistics from UN Comtrade using 'fetch_un_comtrade'.",
+              "Fifth, fetch current weather for global chokepoints using 'fetch_chokepoint_weather'.",
+              "Sixth, fetch active natural disasters from NASA EONET using 'fetch_natural_disasters'.",
+              "",
+              "Correlate the news events with the commodity prices, stocks, forex rates, World Bank indicators, UN Comtrade commercial trade flows, chokepoint weather conditions, and active natural disaster events to construct a structured analysis.",
+              "Explain how the market trends, trade statistics, weather delays, and disaster news reinforce or diminish the risks identified in the news.",
+              "",
+              "Return ONLY a valid JSON object with these top-level keys:",
+              "  generated_at, market_snapshot, critical_signals, implications_for_trade_driven_economies, near_term_actions_for_users",
+              "",
+              "market_snapshot must contain: energy_prices, commodity_indicators, exchange_rates, logistics_and_manufacturing_stocks, macroeconomic_indicators, un_comtrade_trade_flows, chokepoint_weather, active_natural_disasters",
+              "",
+              "Each critical_signals item must have: headline, published_at, source, url, event_type, why_it_matters, affected_countries, commodities, transport_modes, expected_supply_chain_effects, mitigation_suggestions, risk_score (0-100), risk_level",
+              "",
+              "Constraints:",
+              "- event_type must be exactly one of: PORT_DISRUPTION, LABOR_STRIKE, SHIPPING_DISRUPTION, TRADE_POLICY_CHANGE, SANCTIONS, EXPORT_RESTRICTION, IMPORT_RESTRICTION, ENERGY_SHOCK, CYBER_ATTACK, NATURAL_DISASTER, INFRASTRUCTURE_FAILURE, GEOPOLITICAL_EVENT, OTHER",
+              "- risk_level must be exactly one of: LOW, MEDIUM, HIGH, CRITICAL",
+              "- transport_modes elements must be subset of: Ocean, Air, Rail, Road, Pipeline",
+              "- why_it_matters must be concise and action-oriented",
+              "- Return ONLY valid JSON. No markdown fences, prologues, or explanation wrappers."
+            ].join("\n")),
+          ],
+        })
+      );
 
       const rawContent = getFinalModelText(result);
       let structured;

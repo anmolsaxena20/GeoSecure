@@ -1,6 +1,8 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import * as THREE from "three";
+import { useTheme } from "./ThemeContext.jsx";
+import ThemeSlider from "./ThemeSlider.jsx";
 
 /* ----------------------------------------------------------------------
    GeoSecure — geospatial threat intelligence landing page
@@ -115,8 +117,9 @@ function glowSpriteTexture() {
   return new THREE.CanvasTexture(canvas);
 }
 
-function GlobeCanvas({ onLocationSelect }) {
+function GlobeCanvas({ resolvedTheme, onLocationSelect }) {
   const mountRef = useRef(null);
+  const isDark = resolvedTheme === "dark";
 
   useEffect(() => {
     const mount = mountRef.current;
@@ -139,7 +142,6 @@ function GlobeCanvas({ onLocationSelect }) {
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
     renderer.setSize(mount.clientWidth, mount.clientHeight);
     mount.appendChild(renderer.domElement);
-    // allow interactions on the canvas even if parent has pointer-events set
     renderer.domElement.style.pointerEvents = 'auto';
     renderer.domElement.style.cursor = 'grab';
 
@@ -150,12 +152,12 @@ function GlobeCanvas({ onLocationSelect }) {
     let hasMoved = false;
     let lastX = 0;
     let lastY = 0;
-    let earthMeshRef = null; // will be set after textures load
+    let earthMeshRef = null;
 
-    // lighting for phong materials
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.55);
+    // Adjust lighting based on dark/light resolved theme
+    const ambientLight = new THREE.AmbientLight(0xffffff, isDark ? 0.55 : 0.85);
     scene.add(ambientLight);
-    const dirLight = new THREE.DirectionalLight(0xfff6e0, 0.9);
+    const dirLight = new THREE.DirectionalLight(0xfff6e0, isDark ? 0.9 : 1.25);
     dirLight.position.set(5, 3, 5);
     scene.add(dirLight);
 
@@ -163,7 +165,7 @@ function GlobeCanvas({ onLocationSelect }) {
     const globeGroup = new THREE.Group();
     scene.add(globeGroup);
 
-    // Load realistic Earth textures and build globe after textures are ready.
+    // Load realistic Earth textures and build globe
     const manager = new THREE.LoadingManager();
     const texLoader = new THREE.TextureLoader(manager);
     const urls = {
@@ -180,7 +182,6 @@ function GlobeCanvas({ onLocationSelect }) {
     texLoader.load(urls.clouds, (t) => (cloudMap = t));
 
     manager.onLoad = () => {
-      // create earth mesh with PBR-ish material
       const earthGeo = new THREE.SphereGeometry(2, 64, 64);
       const earthMat = new THREE.MeshPhongMaterial({
         map: dayMap,
@@ -192,31 +193,28 @@ function GlobeCanvas({ onLocationSelect }) {
       globeGroup.add(earthMesh);
       earthMeshRef = earthMesh;
 
-      // subtle wireframe overlay
       const wireGeo = new THREE.SphereGeometry(2.015, 32, 32);
       const wireMat = new THREE.MeshBasicMaterial({
-        color: COLORS.cyan,
+        color: isDark ? COLORS.cyan : 0x0d9488,
         wireframe: true,
         transparent: true,
-        opacity: 0.08,
+        opacity: isDark ? 0.08 : 0.04,
       });
       const wireMesh = new THREE.Mesh(wireGeo, wireMat);
       globeGroup.add(wireMesh);
 
-      // cloud layer
       if (cloudMap) {
         const cloudGeo = new THREE.SphereGeometry(2.02, 64, 64);
         const cloudMat = new THREE.MeshPhongMaterial({
           map: cloudMap,
           transparent: true,
-          opacity: 0.55,
+          opacity: isDark ? 0.55 : 0.4,
           depthWrite: false,
         });
         const cloudMesh = new THREE.Mesh(cloudGeo, cloudMat);
         globeGroup.add(cloudMesh);
       }
 
-      // prepare offscreen canvas for land sampling
       const img = dayMap.image;
       const offW = img.width || 1024;
       const offH = img.height || 512;
@@ -226,7 +224,7 @@ function GlobeCanvas({ onLocationSelect }) {
       const offCtx = offCanvas.getContext('2d', { willReadFrequently: true });
       offCtx.drawImage(img, 0, 0, offW, offH);
 
-      // ---- Monitored asset nodes (sample land pixels from day map) ----
+      // Monitored asset nodes
       const nodeCount = 90;
       const nodePositions = new Float32Array(nodeCount * 3);
       const nodeLatLon = [];
@@ -241,7 +239,7 @@ function GlobeCanvas({ onLocationSelect }) {
       const nodeGeo = new THREE.BufferGeometry();
       nodeGeo.setAttribute('position', new THREE.BufferAttribute(nodePositions, 3));
       const nodeMat = new THREE.PointsMaterial({
-        color: COLORS.amber,
+        color: isDark ? COLORS.amber : 0xd97706,
         size: 0.032,
         transparent: true,
         opacity: 0.95,
@@ -250,12 +248,12 @@ function GlobeCanvas({ onLocationSelect }) {
       const nodePoints = new THREE.Points(nodeGeo, nodeMat);
       globeGroup.add(nodePoints);
 
-      // ---- Security arcs between nodes ----
+      // Security arcs
       const arcsGroup = new THREE.Group();
       const arcMat = new THREE.LineBasicMaterial({
-        color: COLORS.cyan,
+        color: isDark ? COLORS.cyan : 0x0d9488,
         transparent: true,
-        opacity: 0.28,
+        opacity: isDark ? 0.28 : 0.4,
         blending: THREE.AdditiveBlending,
       });
       for (let i = 0; i < 9; i++) {
@@ -273,7 +271,7 @@ function GlobeCanvas({ onLocationSelect }) {
       globeGroup.add(arcsGroup);
     };
 
-    // pointer handlers for click-to-pick and drag-to-rotate
+    // Drag / pointer handlers
     function onDragPointerDown(e) {
       isDragging = true;
       hasMoved = false;
@@ -328,10 +326,8 @@ function GlobeCanvas({ onLocationSelect }) {
     }
 
     function onWheel(e) {
-      // rotate globe with wheel
       const delta = e.deltaY;
       globeGroup.rotation.y += delta * 0.0022;
-      // prevent page scroll when over canvas
       e.preventDefault();
     }
 
@@ -340,7 +336,7 @@ function GlobeCanvas({ onLocationSelect }) {
     window.addEventListener('pointerup', onDragPointerUp);
     renderer.domElement.addEventListener('wheel', onWheel, { passive: false });
 
-    // ---- Atmosphere glow ----
+    // ---- Atmosphere glow (rendered only in dark theme for styling contrast) ----
     const glowTexture = glowSpriteTexture();
     const glowMat = new THREE.SpriteMaterial({
       map: glowTexture,
@@ -350,6 +346,7 @@ function GlobeCanvas({ onLocationSelect }) {
     });
     const glowSprite = new THREE.Sprite(glowMat);
     glowSprite.scale.set(6.2, 6.2, 1);
+    glowSprite.visible = isDark;
     scene.add(glowSprite);
 
     // ---- Orbit + satellite ----
@@ -361,23 +358,23 @@ function GlobeCanvas({ onLocationSelect }) {
     const orbitRadius = 2.9;
     const ringGeo = new THREE.TorusGeometry(orbitRadius, 0.003, 8, 128);
     const ringMat = new THREE.MeshBasicMaterial({
-      color: COLORS.cyan,
+      color: isDark ? COLORS.cyan : 0x0d9488,
       transparent: true,
-      opacity: 0.22,
+      opacity: isDark ? 0.22 : 0.45,
     });
     const ringMesh = new THREE.Mesh(ringGeo, ringMat);
     ringMesh.rotation.x = Math.PI / 2;
     orbitGroup.add(ringMesh);
 
     const satGeo = new THREE.SphereGeometry(0.045, 16, 16);
-    const satMat = new THREE.MeshBasicMaterial({ color: COLORS.amber });
+    const satMat = new THREE.MeshBasicMaterial({ color: isDark ? COLORS.amber : 0xb45309 });
     const satellite = new THREE.Mesh(satGeo, satMat);
     orbitGroup.add(satellite);
 
     const satGlow = new THREE.Sprite(
       new THREE.SpriteMaterial({
         map: glowTexture,
-        color: COLORS.amber,
+        color: isDark ? COLORS.amber : 0xb45309,
         blending: THREE.AdditiveBlending,
         transparent: true,
         depthWrite: false,
@@ -386,7 +383,7 @@ function GlobeCanvas({ onLocationSelect }) {
     satGlow.scale.set(0.5, 0.5, 1);
     satellite.add(satGlow);
 
-    // ---- Starfield ----
+    // ---- Starfield (shown only in dark theme for realism) ----
     function makeStars(count, spread, size, color, opacity) {
       const positions = new Float32Array(count * 3);
       for (let i = 0; i < count; i++) {
@@ -409,14 +406,15 @@ function GlobeCanvas({ onLocationSelect }) {
       return new THREE.Points(geo, mat);
     }
     const starsFar = makeStars(1400, 60, 0.05, 0xffffff, 0.55);
-    const starsNear = makeStars(300, 35, 0.09, 0x9fe8de, 0.7);
+    const starsNear = makeStars(300, 35, 0.09, isDark ? 0x9fe8de : 0x0d9488, 0.7);
+    starsFar.visible = isDark;
+    starsNear.visible = isDark;
     scene.add(starsFar);
     scene.add(starsNear);
 
-    // ---- Responsive horizontal offset (globe sits right of copy on desktop) ----
+    // Responsive horizontal offset
     function applyLayoutOffset() {
       const isDesktop = mount.clientWidth >= 1024;
-      // shift the globe further left on desktop (negative x moves left)
       const targetX = isDesktop ? 3 : 0;
       globeGroup.position.x = targetX;
       orbitGroup.position.x = targetX;
@@ -424,7 +422,7 @@ function GlobeCanvas({ onLocationSelect }) {
     }
     applyLayoutOffset();
 
-    // ---- Pointer parallax ----
+    // Pointer parallax
     const pointer = { x: 0, y: 0 };
     const target = { x: 0, y: 0 };
     function onPointerMove(e) {
@@ -433,7 +431,7 @@ function GlobeCanvas({ onLocationSelect }) {
     }
     window.addEventListener("pointermove", onPointerMove);
 
-    // ---- Resize ----
+    // Resize handler
     function handleResize() {
       const w = mount.clientWidth;
       const h = mount.clientHeight;
@@ -446,7 +444,7 @@ function GlobeCanvas({ onLocationSelect }) {
     resizeObserver.observe(mount);
     window.addEventListener("resize", handleResize);
 
-    // ---- Animation loop ----
+    // Animation loop
     const clock = new THREE.Clock();
     let satAngle = 0;
     let frameId;
@@ -456,8 +454,10 @@ function GlobeCanvas({ onLocationSelect }) {
 
       if (!reduceMotion) {
         globeGroup.rotation.y += delta * 0.12;
-        starsFar.rotation.y += delta * 0.004;
-        starsNear.rotation.y -= delta * 0.006;
+        if (isDark) {
+          starsFar.rotation.y += delta * 0.004;
+          starsNear.rotation.y -= delta * 0.006;
+        }
         satAngle += delta * 0.35;
       }
 
@@ -493,7 +493,7 @@ function GlobeCanvas({ onLocationSelect }) {
       });
       renderer.dispose();
     };
-  }, []);
+  }, [resolvedTheme]);
 
   return (
     <div
@@ -511,7 +511,7 @@ function CrosshairMark() {
       height="20"
       viewBox="0 0 20 20"
       fill="none"
-      className="text-[#4ff0d7]"
+      className="text-teal-600 dark:text-[#4ff0d7]"
     >
       <circle cx="10" cy="10" r="7" stroke="currentColor" strokeWidth="1.2" />
       <path
@@ -525,7 +525,19 @@ function CrosshairMark() {
 }
 
 export default function GeoSecureHome({ isAuthenticated, onLogout }) {
+  const { resolvedTheme } = useTheme();
   const [selectedLocation, setSelectedLocation] = useState(null);
+  
+  const storedUser = (() => {
+    try {
+      return JSON.parse(localStorage.getItem("profileUser") || "null");
+    } catch {
+      return null;
+    }
+  })();
+  
+  const profileLabel = storedUser?.name || storedUser?.email || "Account";
+  const profileInitial = profileLabel ? profileLabel.trim().charAt(0).toUpperCase() : "A";
 
   const tickerItems = [
     "24.4539\u00B0 N, 54.3773\u00B0 E \u00B7 NODE SECURE",
@@ -537,7 +549,7 @@ export default function GeoSecureHome({ isAuthenticated, onLogout }) {
   ];
 
   return (
-    <div className="relative min-h-screen w-full overflow-hidden bg-[#05070a] font-body text-[#e8f1f2] selection:bg-[#4ff0d7]/30">
+    <div className="relative min-h-screen w-full overflow-hidden bg-slate-50 dark:bg-[#05070a] font-body text-slate-800 dark:text-[#e8f1f2] selection:bg-teal-500/30 dark:selection:bg-[#4ff0d7]/30 transition-colors duration-300">
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Inter:wght@400;500;600&display=swap');
         .font-display { font-family: 'Space Grotesk', ui-sans-serif, system-ui, sans-serif; }
@@ -556,24 +568,24 @@ export default function GeoSecureHome({ isAuthenticated, onLogout }) {
       `}</style>
 
       {/* Vignette / color grade */}
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_50%_-10%,rgba(79,240,215,0.08),transparent_60%),radial-gradient(ellipse_at_85%_85%,rgba(255,180,84,0.05),transparent_50%)]" />
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_50%_-10%,rgba(13,148,136,0.08),transparent_60%),radial-gradient(ellipse_at_85%_85%,rgba(217,119,6,0.05),transparent_50%)] dark:bg-[radial-gradient(ellipse_at_50%_-10%,rgba(79,240,215,0.08),transparent_60%),radial-gradient(ellipse_at_85%_85%,rgba(255,180,84,0.05),transparent_50%)]" />
 
       {/* 3D globe canvas */}
-      <GlobeCanvas onLocationSelect={setSelectedLocation} />
+      <GlobeCanvas resolvedTheme={resolvedTheme} onLocationSelect={setSelectedLocation} />
 
       {selectedLocation && (
-        <div className="pointer-events-auto fixed bottom-4 left-4 z-[1000] max-w-sm rounded-xl border border-[#4ff0d7]/30 bg-[#04141c]/85 p-4 text-left shadow-2xl backdrop-blur">
-          <div className="font-mono text-[10px] uppercase tracking-[0.3em] text-[#4ff0d7]">
+        <div className="pointer-events-auto fixed bottom-4 left-4 z-[1000] max-w-sm rounded-xl border border-teal-500/30 dark:border-[#4ff0d7]/30 bg-white/90 dark:bg-[#04141c]/85 p-4 text-left shadow-lg dark:shadow-2xl backdrop-blur">
+          <div className="font-mono text-[10px] uppercase tracking-[0.3em] text-teal-600 dark:text-[#4ff0d7]">
             Selected point
           </div>
-          <div className="mt-2 font-display text-lg text-[#e8f1f2]">
+          <div className="mt-2 font-display text-lg text-slate-900 dark:text-[#e8f1f2]">
             {selectedLocation.lat.toFixed(4)}° {selectedLocation.lat >= 0 ? 'N' : 'S'}, {selectedLocation.lon.toFixed(4)}° {selectedLocation.lon >= 0 ? 'E' : 'W'}
           </div>
           <a
             href={selectedLocation.googleMapsUrl}
             target="_blank"
             rel="noreferrer"
-            className="mt-3 inline-flex items-center gap-2 font-mono text-xs uppercase tracking-[0.25em] text-[#4ff0d7] transition-colors hover:text-[#7bf5e1]"
+            className="mt-3 inline-flex items-center gap-2 font-mono text-xs uppercase tracking-[0.25em] text-teal-600 dark:text-[#4ff0d7] transition-colors hover:text-teal-500 dark:hover:text-[#7bf5e1]"
           >
             Open in Google Maps
             <span aria-hidden="true">↗</span>
@@ -587,38 +599,69 @@ export default function GeoSecureHome({ isAuthenticated, onLogout }) {
         <nav className="flex items-center justify-between px-6 py-6 lg:px-16">
           <div className="flex items-center gap-2">
             <CrosshairMark />
-            <span className="font-display text-lg font-semibold tracking-wide">
+            <span className="font-display text-lg font-semibold tracking-wide text-slate-900 dark:text-[#e8f1f2]">
               GEOSECURE
             </span>
           </div>
-          <div className="hidden items-center gap-8 font-mono text-xs uppercase tracking-widest text-[#8fa3ad] md:flex">
-            <a href="#" className="transition-colors hover:text-[#e8f1f2]">
+          <div className="hidden items-center gap-8 font-mono text-xs uppercase tracking-widest text-slate-500 dark:text-[#8fa3ad] md:flex">
+            <a href="#" className="transition-colors hover:text-slate-900 dark:hover:text-[#e8f1f2]">
               Platform
             </a>
-            <a href="#" className="transition-colors hover:text-[#e8f1f2]">
+            <a href="#" className="transition-colors hover:text-slate-900 dark:hover:text-[#e8f1f2]">
               Intelligence
             </a>
-            <a href="#" className="transition-colors hover:text-[#e8f1f2]">
+            <a href="#" className="transition-colors hover:text-slate-900 dark:hover:text-[#e8f1f2]">
               Coverage
             </a>
-            <a href="#" className="transition-colors hover:text-[#e8f1f2]">
+            <a href="#" className="transition-colors hover:text-slate-900 dark:hover:text-[#e8f1f2]">
               Docs
             </a>
           </div>
+          
           <div className="flex items-center gap-3">
+            {/* Theme slider positioned at the top */}
+            <ThemeSlider isAuthenticated={isAuthenticated} />
+            
             {isAuthenticated ? (
-              <button
-                onClick={onLogout}
-                className="rounded-sm bg-red-500/20 border border-red-500/40 px-4 py-2 font-mono text-xs uppercase tracking-widest text-red-400 transition-colors hover:bg-red-500/30 hover:border-red-500/60"
-              >
-                Logout
-              </button>
+              <>
+                <Link
+                  to="/profile"
+                  className="inline-flex items-center gap-2 rounded-full border border-slate-200 dark:border-[#4ff0d7]/30 bg-slate-100 dark:bg-white/5 px-3 py-2 text-left transition-colors hover:bg-slate-200 dark:hover:bg-white/10"
+                >
+                  {/* Render the user's avatar image if it exists, otherwise fallback to their profile initial */}
+                  {storedUser?.imageUrl ? (
+                    <img
+                      src={storedUser.imageUrl}
+                      alt="Profile"
+                      className="h-8 w-8 rounded-full object-cover border border-teal-200 dark:border-transparent bg-slate-100 dark:bg-slate-800"
+                    />
+                  ) : (
+                    <span className="flex h-8 w-8 items-center justify-center rounded-full bg-teal-600 dark:bg-[#4ff0d7] font-mono text-xs font-semibold text-white dark:text-[#04141c]">
+                      {profileInitial}
+                    </span>
+                  )}
+                  <span className="hidden flex-col text-left leading-tight sm:flex">
+                    <span className="font-mono text-[10px] uppercase tracking-[0.25em] text-slate-400 dark:text-[#8fa3ad]">
+                      Profile
+                    </span>
+                    <span className="max-w-[10rem] truncate font-display text-sm text-slate-800 dark:text-[#e8f1f2]">
+                      {profileLabel}
+                    </span>
+                  </span>
+                </Link>
+                <button
+                  onClick={onLogout}
+                  className="rounded-sm bg-red-500/10 border border-red-500/30 px-4 py-2 font-mono text-xs uppercase tracking-widest text-red-600 dark:text-red-400 transition-colors hover:bg-red-500/20 hover:border-red-500/50"
+                >
+                  Logout
+                </button>
+              </>
             ) : (
               <>
-                <Link to="/login" className="font-mono text-xs uppercase tracking-widest text-[#8fa3ad] transition-colors hover:text-[#e8f1f2]">
+                <Link to="/login" className="font-mono text-xs uppercase tracking-widest text-slate-500 dark:text-[#8fa3ad] transition-colors hover:text-slate-900 dark:hover:text-[#e8f1f2]">
                   Sign in
                 </Link>
-                <button className="rounded-sm border border-[#4ff0d7]/40 bg-[#4ff0d7]/10 px-4 py-2 font-mono text-xs uppercase tracking-widest text-[#4ff0d7] transition-colors hover:bg-[#4ff0d7]/20">
+                <button className="rounded-sm border border-teal-500/40 bg-teal-50 dark:border-[#4ff0d7]/40 dark:bg-[#4ff0d7]/10 px-4 py-2 font-mono text-xs uppercase tracking-widest text-teal-700 dark:text-[#4ff0d7] transition-colors hover:bg-teal-100 dark:hover:bg-[#4ff0d7]/20">
                   Get access
                 </button>
               </>
@@ -629,53 +672,53 @@ export default function GeoSecureHome({ isAuthenticated, onLogout }) {
         {/* Hero */}
         <main className="flex flex-1 items-center px-6 lg:px-16">
           <div className="max-w-xl py-12 lg:py-0">
-            <div className="mb-6 flex items-center gap-2 font-mono text-xs uppercase tracking-[0.3em] text-[#4ff0d7]">
-              <span className="h-1.5 w-1.5 rounded-full bg-[#4ff0d7] animate-pulse" />
+            <div className="mb-6 flex items-center gap-2 font-mono text-xs uppercase tracking-[0.3em] text-teal-600 dark:text-[#4ff0d7]">
+              <span className="h-1.5 w-1.5 rounded-full bg-teal-600 dark:bg-[#4ff0d7] animate-pulse" />
               Geospatial threat intelligence
             </div>
-            <h1 className="font-display text-5xl font-medium leading-[1.05] tracking-tight sm:text-6xl">
+            <h1 className="font-display text-5xl font-medium leading-[1.05] tracking-tight text-slate-900 dark:text-[#e8f1f2] sm:text-6xl">
               See every asset.
               <br />
-              <span className="text-[#4ff0d7]">Everywhere,</span> in real
+              <span className="text-teal-600 dark:text-[#4ff0d7]">Everywhere,</span> in real
               time.
             </h1>
-            <p className="mt-6 max-w-md text-base leading-relaxed text-[#8fa3ad]">
+            <p className="mt-6 max-w-md text-base leading-relaxed text-slate-500 dark:text-[#8fa3ad]">
               GeoSecure fuses satellite telemetry, network signal, and
               on-ground sensors into a single live map — so your team sees
               risk before it reaches the perimeter.
             </p>
             <div className="mt-9 flex flex-wrap items-center gap-5">
-              <button className="rounded-sm bg-[#4ff0d7] px-6 py-3 font-mono text-xs font-semibold uppercase tracking-widest text-[#04141c] transition-colors hover:bg-[#7bf5e1]">
+              <button className="rounded-sm bg-teal-600 hover:bg-teal-500 dark:bg-[#4ff0d7] px-6 py-3 font-mono text-xs font-semibold uppercase tracking-widest text-white dark:text-[#04141c] transition-colors dark:hover:bg-[#7bf5e1]">
                 Request access
               </button>
-              <button className="group flex items-center gap-2 font-mono text-xs uppercase tracking-widest text-[#e8f1f2] transition-colors hover:text-[#4ff0d7]" onClick={() => window.location.href = '/dashboard'}>
-                View Dashboard
+              <button className="group flex items-center gap-2 font-mono text-xs uppercase tracking-widest text-[#e8f1f2] transition-colors hover:text-[#4ff0d7]">
+                View live map
                 <span className="transition-transform group-hover:translate-x-1">
                   &rarr;
                 </span>
               </button>
             </div>
 
-            <div className="mt-14 grid max-w-md grid-cols-3 gap-6 border-t border-white/10 pt-6">
+            <div className="mt-14 grid max-w-md grid-cols-3 gap-6 border-t border-slate-200 dark:border-white/10 pt-6">
               <div>
-                <div className="font-display text-xl font-semibold">
+                <div className="font-display text-xl font-semibold text-slate-900 dark:text-white">
                   14,208
                 </div>
-                <div className="mt-1 font-mono text-[10px] uppercase tracking-widest text-[#5c7078]">
+                <div className="mt-1 font-mono text-[10px] uppercase tracking-widest text-slate-400 dark:text-[#5c7078]">
                   Assets tracked
                 </div>
               </div>
               <div>
-                <div className="font-display text-xl font-semibold">142</div>
-                <div className="mt-1 font-mono text-[10px] uppercase tracking-widest text-[#5c7078]">
+                <div className="font-display text-xl font-semibold text-slate-900 dark:text-white">142</div>
+                <div className="mt-1 font-mono text-[10px] uppercase tracking-widest text-slate-400 dark:text-[#5c7078]">
                   Countries covered
                 </div>
               </div>
               <div>
-                <div className="font-display text-xl font-semibold">
+                <div className="font-display text-xl font-semibold text-slate-900 dark:text-white">
                   99.98%
                 </div>
-                <div className="mt-1 font-mono text-[10px] uppercase tracking-widest text-[#5c7078]">
+                <div className="mt-1 font-mono text-[10px] uppercase tracking-widest text-slate-400 dark:text-[#5c7078]">
                   Uptime
                 </div>
               </div>
@@ -684,19 +727,19 @@ export default function GeoSecureHome({ isAuthenticated, onLogout }) {
         </main>
 
         {/* Live feed ticker */}
-        <div className="flex items-center gap-6 overflow-hidden border-t border-white/10 bg-black/30 px-6 py-3 backdrop-blur-sm lg:px-16">
-          <div className="flex shrink-0 items-center gap-2 font-mono text-[11px] uppercase tracking-widest text-[#4ff0d7]">
-            <span className="h-1.5 w-1.5 rounded-full bg-[#4ff0d7] animate-pulse" />
+        <div className="flex items-center gap-6 overflow-hidden border-t border-slate-200 dark:border-white/10 bg-slate-100/50 dark:bg-black/30 px-6 py-3 backdrop-blur-sm lg:px-16">
+          <div className="flex shrink-0 items-center gap-2 font-mono text-[11px] uppercase tracking-widest text-teal-600 dark:text-[#4ff0d7]">
+            <span className="h-1.5 w-1.5 rounded-full bg-teal-600 dark:bg-[#4ff0d7] animate-pulse" />
             Live feed
           </div>
           <div className="relative flex-1 overflow-hidden">
-            <div className="ticker-track flex w-max gap-10 whitespace-nowrap font-mono text-[11px] uppercase tracking-widest text-[#5c7078]">
+            <div className="ticker-track flex w-max gap-10 whitespace-nowrap font-mono text-[11px] uppercase tracking-widest text-slate-500 dark:text-[#5c7078]">
               {[...tickerItems, ...tickerItems].map((item, i) => (
                 <span key={i}>{item}</span>
               ))}
             </div>
           </div>
-          <div className="hidden shrink-0 font-mono text-[11px] uppercase tracking-widest text-[#5c7078] sm:block">
+          <div className="hidden shrink-0 font-mono text-[11px] uppercase tracking-widest text-slate-400 dark:text-[#5c7078] sm:block">
             &copy; 2026 GeoSecure
           </div>
         </div>

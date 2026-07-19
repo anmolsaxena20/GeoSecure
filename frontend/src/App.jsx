@@ -5,6 +5,8 @@ import {Analytics} from '@vercel/analytics/react'
 import GeoSecureHome from './GeoSecureHome.jsx'
 import Login from './Login.jsx'
 import Signup from './Signup.jsx'
+import Profile from './Profile.jsx'
+import { API_ENDPOINTS } from './config/api.js'
 import Dashboard from './Dashboard.jsx'
 
 export default function App() {
@@ -13,17 +15,53 @@ export default function App() {
 
   // Check authentication status on mount
   useEffect(() => {
+    const searchParams = new URLSearchParams(window.location.search)
+    const accessToken = searchParams.get('accessToken')
+    const userParam = searchParams.get('user')
+
+    if (accessToken) {
+      localStorage.setItem('accessToken', accessToken)
+      if (userParam) {
+        try {
+          localStorage.setItem('profileUser', userParam)
+        } catch {
+          localStorage.setItem('profileUser', userParam)
+        }
+      }
+      window.history.replaceState({}, document.title, window.location.pathname)
+    }
+
     const token = localStorage.getItem('accessToken')
     setIsAuthenticated(!!token)
     setLoading(false)
   }, [])
 
   const handleLoginSuccess = (data) => {
+    if (data?.user) {
+      localStorage.setItem('profileUser', JSON.stringify(data.user))
+    }
     setIsAuthenticated(true)
   }
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    const token = localStorage.getItem('accessToken')
+
+    if (token) {
+      try {
+        await fetch(API_ENDPOINTS.AUTH.LOGOUT, {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+          credentials: 'include',
+        })
+      } catch {
+        // Ignore transport errors and clear local state below.
+      }
+    }
+
     localStorage.removeItem('accessToken')
+    localStorage.removeItem('profileUser')
     setIsAuthenticated(false)
   }
 
@@ -50,10 +88,6 @@ export default function App() {
         <Route 
           path="/" 
           element={<GeoSecureHome onLogout={handleLogout} isAuthenticated={isAuthenticated} />} 
-        />
-        <Route 
-          path="/dashboard" 
-          element={isAuthenticated ? <Dashboard onLogout={handleLogout} /> : <Navigate to="/login" />} 
         />
         <Route 
           path="/login" 
