@@ -3,6 +3,7 @@ import {
   fetchMarketData,
   fetchNews,
   generateReport,
+  getDisruptionScenarios,
   getCommodityRiskScores,
   getCorridorRiskScores,
   getHighRiskEvents,
@@ -15,6 +16,7 @@ const router = Router();
 router.get("/report", generateReport);
 router.get("/market", fetchMarketData);
 router.get("/news", fetchNews);
+router.get("/scenarios", getDisruptionScenarios);
 router.post("/disruption/run", runDisruptionAgent);
 router.get("/disruption/corridors", getCorridorRiskScores);
 router.get("/disruption/commodities", getCommodityRiskScores);

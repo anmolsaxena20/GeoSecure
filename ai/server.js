@@ -13,6 +13,10 @@ import {
   runSupplyChainEconomiesAgent,
   getHighRiskEvents,
 } from "./controllers/supplyChainEconomiesController.js";
+import {
+  getProcurementRecommendations,
+  runProcurementOrchestrator,
+} from "./controllers/procurementController.js";
 import { startNewsCron } from "./polling/pollingAgent.js";
 
 const app = express();
@@ -108,6 +112,26 @@ app.post("/api/ai/economies/run", requireApiKey, async (_req, res, next) => {
     return next(error);
   }
 });
+
+app.post("/api/ai/procurement/run", requireApiKey, async (_req, res, next) => {
+  try {
+    return await sendJson(res, runProcurementOrchestrator);
+  } catch (error) {
+    return next(error);
+  }
+});
+
+app.get(
+  "/api/ai/procurement/recommendations",
+  requireApiKey,
+  async (_req, res, next) => {
+    try {
+      return await sendJson(res, getProcurementRecommendations);
+    } catch (error) {
+      return next(error);
+    }
+  },
+);
 
 app.get(
   "/api/ai/economies/high-risk-events",

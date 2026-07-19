@@ -17,6 +17,13 @@ export const API_ENDPOINTS = {
     UPLOAD: `${API_BASE_URL}/api/users/upload`,
     THEME: `${API_BASE_URL}/api/users/theme`,
   },
+  PROCUREMENT: {
+    RUN: `${API_BASE_URL}/api/procurement/run`,
+    RECOMMENDATIONS: `${API_BASE_URL}/api/procurement/recommendations`,
+  },
+  DISRUPTION: {
+    SCENARIOS: `${API_BASE_URL}/api/disruption/scenarios`,
+  },
 };
 
 export default API_BASE_URL;
