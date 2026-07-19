@@ -7,6 +7,8 @@ import Login from './Login.jsx'
 import Signup from './Signup.jsx'
 import Profile from './Profile.jsx'
 import DigitalTwin from './DigitalTwin.jsx'
+import ProcumentOrchestrator from './ProcumentOrchestrator.jsx'
+import DisruptionScenario from './DisruptionScenario.jsx'
 import { API_ENDPOINTS } from './config/api.js'
 import Dashboard from './Dashboard.jsx'
 
@@ -101,6 +103,18 @@ export default function App() {
         <Route 
           path="/dashboard" 
           element={isAuthenticated ? <Dashboard onLogout={handleLogout} /> : <Navigate to="/login" />} 
+        />
+        <Route
+          path="/procurement-orchestrator"
+          element={isAuthenticated ? <ProcumentOrchestrator onLogout={handleLogout} /> : <Navigate to="/login" />}
+        />
+        <Route
+          path="/procument-orchestrator"
+          element={<Navigate to="/procurement-orchestrator" replace />}
+        />
+        <Route
+          path="/disruption-scenario"
+          element={isAuthenticated ? <DisruptionScenario onLogout={handleLogout} /> : <Navigate to="/login" />}
         />
         <Route path="/digitaltwin" element={<DigitalTwin isAuthenticated={isAuthenticated} />} />
         <Route path="*" element={<Navigate to="/" />} />

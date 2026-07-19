@@ -1,14 +1,25 @@
 import { aiHttpCall } from "../config/ai.config.js";
 import { getRedisClient } from "../config/redis.config.js";
+import { promises as fs } from "fs";
+import path from "path";
+import { fileURLToPath } from "url";
 
 const DISRUPTION_CACHE_TTL_SECONDS = Number(
   process.env.DISRUPTION_CACHE_TTL_SECONDS || 300,
+);
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const disruptionScenarioDataPath = path.resolve(
+  __dirname,
+  "../../../ai/agents/dashboard_data.js",
 );
 
 const disruptionCacheKeys = {
   RunDisruptionAgent: "cache:disruption:run",
   GetCorridorRiskScores: "cache:disruption:corridors",
   GetCommodityRiskScores: "cache:disruption:commodities",
+  GetProcurementRecommendations: "cache:procurement:recommendations",
 };
 
 const parseCachedValue = (value) => {
@@ -130,6 +141,38 @@ export const runSupplyChainEconomiesAgent = async (_req, res, next) => {
 export const getHighRiskEvents = async (_req, res, next) => {
   try {
     return await sendAiResult(res, "GetHighRiskEvents");
+  } catch (error) {
+    return next(error);
+  }
+};
+
+export const runProcurementOrchestrator = async (_req, res, next) => {
+  try {
+    return await sendAiResult(res, "RunProcurementOrchestrator");
+  } catch (error) {
+    return next(error);
+  }
+};
+
+export const getProcurementRecommendations = async (_req, res, next) => {
+  try {
+    return await sendAiResult(res, "GetProcurementRecommendations");
+  } catch (error) {
+    return next(error);
+  }
+};
+
+export const getDisruptionScenarios = async (_req, res, next) => {
+  try {
+    const fileContents = await fs.readFile(disruptionScenarioDataPath, "utf8");
+    const match = fileContents.match(/const\s+dashboardData\s*=\s*([\s\S]*?);\s*$/);
+
+    if (!match) {
+      throw new Error("Unable to parse disruption scenario data");
+    }
+
+    const structured = new Function(`return (${match[1]});`)();
+    return res.status(200).json(structured);
   } catch (error) {
     return next(error);
   }

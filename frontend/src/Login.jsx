@@ -104,20 +104,6 @@ const Login = ({ onLoginSuccess }) => {
               GEOSECURE
             </span>
           </Link>
-          <div className="hidden items-center gap-8 font-mono text-xs uppercase tracking-widest text-[#8fa3ad] md:flex">
-            <a href="#" className="transition-colors hover:text-[#e8f1f2]">
-              Platform
-            </a>
-            <a href="#" className="transition-colors hover:text-[#e8f1f2]">
-              Intelligence
-            </a>
-            <a href="#" className="transition-colors hover:text-[#e8f1f2]">
-              Coverage
-            </a>
-            <a href="#" className="transition-colors hover:text-[#e8f1f2]">
-              Docs
-            </a>
-          </div>
           <div className="flex items-center gap-3">
             <Link to="/" className="font-mono text-xs uppercase tracking-widest text-[#8fa3ad] transition-colors hover:text-[#e8f1f2]">
               Back to home

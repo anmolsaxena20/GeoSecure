@@ -4,6 +4,7 @@ import express from "express";
 import passport from "passport";
 import "./config/passport.config.js";
 import { disruptionRouter } from "./routes/disruption.routes.js";
+import { procurementRouter } from "./routes/procurement.routes.js";
 import { errorHandler, notFound } from "./middlewares/error.middleware.js";
 import { authRouter } from "./routes/auth.routes.js";
 import { userRouter } from "./routes/user.routes.js";
@@ -29,6 +30,7 @@ app.get("/api/ai/health", (_req, res) => {
 
 app.use("/api/auth", authRouter);
 app.use("/api/disruption", requireAuth, disruptionRouter);
+app.use("/api/procurement", requireAuth, procurementRouter);
 app.use("/api/users", requireAuth, userRouter);
 app.use(notFound);
 app.use(errorHandler);

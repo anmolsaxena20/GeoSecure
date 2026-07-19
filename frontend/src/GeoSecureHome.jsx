@@ -604,18 +604,6 @@ export default function GeoSecureHome({ isAuthenticated, onLogout }) {
             </span>
           </div>
           <div className="hidden items-center gap-8 font-mono text-xs uppercase tracking-widest text-slate-500 dark:text-[#8fa3ad] md:flex">
-            <a href="#" className="transition-colors hover:text-slate-900 dark:hover:text-[#e8f1f2]">
-              Platform
-            </a>
-            <a href="#" className="transition-colors hover:text-slate-900 dark:hover:text-[#e8f1f2]">
-              Intelligence
-            </a>
-            <a href="#" className="transition-colors hover:text-slate-900 dark:hover:text-[#e8f1f2]">
-              Coverage
-            </a>
-            <a href="#" className="transition-colors hover:text-slate-900 dark:hover:text-[#e8f1f2]">
-              Docs
-            </a>
             {isAuthenticated && (
               <>
                 <Link
@@ -623,6 +611,18 @@ export default function GeoSecureHome({ isAuthenticated, onLogout }) {
                   className="transition-colors hover:text-slate-900 dark:hover:text-[#e8f1f2]"
                 >
                   Dashboard
+                </Link>
+                <Link
+                  to="/disruption-scenario"
+                  className="transition-colors hover:text-slate-900 dark:hover:text-[#e8f1f2]"
+                >
+                  Disruption Scenario
+                </Link>
+                <Link
+                  to="/procurement-orchestrator"
+                  className="transition-colors hover:text-slate-900 dark:hover:text-[#e8f1f2]"
+                >
+                  Procument Orchestrator
                 </Link>
                 <Link
                   to="/digitaltwin"
@@ -673,17 +673,12 @@ export default function GeoSecureHome({ isAuthenticated, onLogout }) {
                 </button>
               </>
             ) : (
-              <>
-                <Link to="/login" className="font-mono text-xs uppercase tracking-widest text-slate-500 dark:text-[#8fa3ad] transition-colors hover:text-slate-900 dark:hover:text-[#e8f1f2]">
-                  Sign in
-                </Link>
-                <Link
-                  to="/login"
-                  className="rounded-sm border border-teal-500/40 bg-teal-50 dark:border-[#4ff0d7]/40 dark:bg-[#4ff0d7]/10 px-4 py-2 font-mono text-xs uppercase tracking-widest text-teal-700 dark:text-[#4ff0d7] transition-colors hover:bg-teal-100 dark:hover:bg-[#4ff0d7]/20"
-                >
-                  Request access
-                </Link>
-              </>
+              <Link
+                to="/login"
+                className="rounded-sm border border-teal-500/40 bg-teal-50 dark:border-[#4ff0d7]/40 dark:bg-[#4ff0d7]/10 px-4 py-2 font-mono text-xs uppercase tracking-widest text-teal-700 dark:text-[#4ff0d7] transition-colors hover:bg-teal-100 dark:hover:bg-[#4ff0d7]/20"
+              >
+                Request access
+              </Link>
             )}
           </div>
         </nav>
@@ -716,6 +711,18 @@ export default function GeoSecureHome({ isAuthenticated, onLogout }) {
                     Open dashboard
                   </Link>
                   <Link
+                    to="/disruption-scenario"
+                    className="rounded-sm border border-[#ffb454]/30 bg-[#ffb454]/10 px-6 py-3 font-mono text-xs font-semibold uppercase tracking-widest text-[#ffb454] transition-colors hover:bg-[#ffb454]/20 dark:border-[#ffb454]/30 dark:bg-[#ffb454]/10 dark:text-[#ffb454] dark:hover:bg-[#ffb454]/20"
+                  >
+                    Disruption Scenario
+                  </Link>
+                  <Link
+                    to="/procurement-orchestrator"
+                    className="rounded-sm border border-teal-500/30 bg-teal-50/60 px-6 py-3 font-mono text-xs font-semibold uppercase tracking-widest text-teal-700 transition-colors hover:bg-teal-100 dark:border-[#4ff0d7]/30 dark:bg-[#4ff0d7]/10 dark:text-[#4ff0d7] dark:hover:bg-[#4ff0d7]/20"
+                  >
+                    Procument Orchestrator
+                  </Link>
+                  <Link
                     to="/digitaltwin"
                     className="rounded-sm border border-white/10 bg-white/5 px-6 py-3 font-mono text-xs font-semibold uppercase tracking-widest text-[#e8f1f2] transition-colors hover:border-teal-500 hover:text-teal-500"
                   >
@@ -723,23 +730,12 @@ export default function GeoSecureHome({ isAuthenticated, onLogout }) {
                   </Link>
                 </>
               ) : (
-                <>
-                  <Link
-                    to="/login"
-                    className="rounded-sm bg-teal-600 hover:bg-teal-500 dark:bg-[#4ff0d7] px-6 py-3 font-mono text-xs font-semibold uppercase tracking-widest text-white dark:text-[#04141c] transition-colors dark:hover:bg-[#7bf5e1]"
-                  >
-                    Request access
-                  </Link>
-                  <Link
-                    to="/login"
-                    className="group flex items-center gap-2 font-mono text-xs uppercase tracking-widest text-[#e8f1f2] transition-colors hover:text-[#4ff0d7]"
-                  >
-                    View live map
-                    <span className="transition-transform group-hover:translate-x-1">
-                      →
-                    </span>
-                  </Link>
-                </>
+                <Link
+                  to="/login"
+                  className="rounded-sm bg-teal-600 hover:bg-teal-500 dark:bg-[#4ff0d7] px-6 py-3 font-mono text-xs font-semibold uppercase tracking-widest text-white dark:text-[#04141c] transition-colors dark:hover:bg-[#7bf5e1]"
+                >
+                  Request access
+                </Link>
               )}
             </div>
 

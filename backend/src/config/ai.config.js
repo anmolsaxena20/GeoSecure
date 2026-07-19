@@ -19,6 +19,14 @@ const routeMap = {
     method: "GET",
     path: "/api/ai/economies/high-risk-events",
   },
+  RunProcurementOrchestrator: {
+    method: "POST",
+    path: "/api/ai/procurement/run",
+  },
+  GetProcurementRecommendations: {
+    method: "GET",
+    path: "/api/ai/procurement/recommendations",
+  },
 };
 
 const normalizeBaseUrl = (value) => {
