@@ -3,6 +3,7 @@ import cors from "cors";
 import express from "express";
 import passport from "passport";
 import "./config/passport.config.js";
+import { commodityRouter } from "./routes/commodity.routes.js";
 import { disruptionRouter } from "./routes/disruption.routes.js";
 import { procurementRouter } from "./routes/procurement.routes.js";
 import { errorHandler, notFound } from "./middlewares/error.middleware.js";
@@ -29,6 +30,7 @@ app.get("/api/ai/health", (_req, res) => {
 });
 
 app.use("/api/auth", authRouter);
+app.use("/api/commodities", requireAuth, commodityRouter);
 app.use("/api/disruption", requireAuth, disruptionRouter);
 app.use("/api/procurement", requireAuth, procurementRouter);
 app.use("/api/users", requireAuth, userRouter);
