@@ -18,3 +18,25 @@ export const getPinnedCommodities = async (req, res, next) => {
     return next(error);
   }
 };
+export const deletePinnedCommodity = async (req, res, next) => {
+  try {
+    const commodityIdToBeDeleted = req.body.commodityId;
+    const userId = req.user.id;
+    const user = await prisma.user.update({
+      where: {
+        id: userId,
+      },
+      data: {
+        pinnedCommodities: {
+          disconnect: [{ id: commodityIdToBeDeleted }],
+        },
+      },
+      select: {
+        pinnedCommodities: true,
+      },
+    });
+    return res.status(200).json({ pinnedCommodities: user.pinnedCommodities });
+  } catch (error) {
+    next(error);
+  }
+};
