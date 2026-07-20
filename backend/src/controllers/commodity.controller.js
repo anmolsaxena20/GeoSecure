@@ -18,6 +18,27 @@ export const getPinnedCommodities = async (req, res, next) => {
     return next(error);
   }
 };
+export const pinCommodity = async (req, res, next) => {
+  try {
+    const commodityIdToBePinned = req.body.commodityId;
+    const userId = req.user.id;
+    const user = await prisma.user.update({
+      where: {
+        id: userId,
+      },
+      data: {
+        pinnedCommodities: {
+          connect: [{ id: commodityIdToBePinned }],
+        },
+      },
+      select: {
+        pinnedCommodities: true,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
 export const deletePinnedCommodity = async (req, res, next) => {
   try {
     const commodityIdToBeDeleted = req.body.commodityId;
@@ -36,6 +57,15 @@ export const deletePinnedCommodity = async (req, res, next) => {
       },
     });
     return res.status(200).json({ pinnedCommodities: user.pinnedCommodities });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const showAvailableCommodities = async (req, res, next) => {
+  try {
+    const avaiableCommodities = await prisma.commodity.findMany();
+    return res.status(200).json({ availableCommodity: avaiableCommodities });
   } catch (error) {
     next(error);
   }
