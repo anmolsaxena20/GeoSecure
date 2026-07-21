@@ -1,6 +1,7 @@
-import React, { useEffect, useRef, useState } from "react";
-import { Link } from "react-router-dom";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import * as THREE from "three";
+import { API_ENDPOINTS } from "./config/api.js";
 
 const commodityData = [
   {
@@ -41,17 +42,46 @@ const commodityData = [
 ];
 
 function RiskPill({ level }) {
+  const normalizedLevel = String(level || "").trim().toLowerCase();
+  const displayLevel = normalizedLevel ? normalizedLevel.charAt(0).toUpperCase() + normalizedLevel.slice(1) : "Unknown";
   const styles = {
     High: "border-red-400/30 bg-red-500/10 text-red-300",
     Medium: "border-[#ffb454]/30 bg-[#ffb454]/10 text-[#ffb454]",
     Low: "border-[#4ff0d7]/30 bg-[#4ff0d7]/10 text-[#4ff0d7]",
   };
 
+  const className = styles[displayLevel] || "border-white/10 bg-white/5 text-[#c9d5da]";
+
   return (
-    <span className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.24em] ${styles[level]}`}>
-      {level}
+    <span className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.24em] ${className}`}>
+      {displayLevel}
     </span>
   );
+}
+
+const PAGE_SIZE = 3;
+const REFRESH_INTERVAL_MS = 30000;
+
+function getAuthHeaders(token) {
+  return {
+    Authorization: `Bearer ${token}`,
+    "Content-Type": "application/json",
+  };
+}
+
+function toCommodityCard(commodity) {
+  const disruptionProbability = Number(commodity?.disruptionProbability) || 0;
+  const riskLevel = commodity?.riskLevel || "Low";
+  const updatedAt = commodity?.updatedAt ? new Date(commodity.updatedAt) : null;
+
+  return {
+    id: commodity.id,
+    name: commodity.commodity,
+    region: updatedAt ? `Updated ${updatedAt.toLocaleDateString(undefined, { month: "short", day: "numeric" })}` : "Live commodity feed",
+    risk: riskLevel,
+    signal: `Disruption probability at ${disruptionProbability}% across the live risk feed.`,
+    trend: `${disruptionProbability >= 50 ? "+" : ""}${disruptionProbability}%`,
+  };
 }
 
 function latLonToVector3(lat, lon, radius) {
@@ -233,8 +263,181 @@ function GlobeVisual() {
 }
 
 export default function Dashboard({ onLogout }) {
-  const [showAll, setShowAll] = useState(false);
-  const visibleCommodities = showAll ? commodityData : commodityData.slice(0, 3);
+  const navigate = useNavigate();
+  const [pinnedCommodities, setPinnedCommodities] = useState([]);
+  const [availableCommodities, setAvailableCommodities] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [syncingCommodityId, setSyncingCommodityId] = useState(null);
+  const [hasMoreCommodities, setHasMoreCommodities] = useState(true);
+  const [error, setError] = useState("");
+
+  const token = localStorage.getItem("accessToken");
+
+  const pinnedIds = useMemo(
+    () => new Set(pinnedCommodities.map((commodity) => commodity.id)),
+    [pinnedCommodities],
+  );
+  const topConcern = useMemo(
+    () => pinnedCommodities[0] || availableCommodities[0] || commodityData[0] || null,
+    [pinnedCommodities, availableCommodities],
+  );
+  const statusSource = availableCommodities.length > 0 ? availableCommodities : commodityData;
+  const statusCounts = useMemo(
+    () => statusSource.reduce(
+      (accumulator, commodity) => {
+        const risk = String(commodity.risk || commodity.riskLevel || "").toLowerCase();
+
+        if (risk === "high") accumulator.high += 1;
+        if (risk === "medium") accumulator.medium += 1;
+        if (risk === "low") accumulator.low += 1;
+
+        return accumulator;
+      },
+      { high: 0, medium: 0, low: 0 },
+    ),
+    [statusSource],
+  );
+
+  const handleUnauthorized = async () => {
+    await onLogout?.();
+    navigate("/login", { replace: true });
+  };
+
+  const loadPinnedCommodities = async () => {
+    if (!token) return [];
+
+    const response = await fetch(API_ENDPOINTS.COMMODITIES.PINNED, {
+      headers: getAuthHeaders(token),
+      credentials: "include",
+    });
+    const payload = await response.json().catch(() => ({}));
+
+    if (response.status === 401) {
+      await handleUnauthorized();
+      return [];
+    }
+
+    if (!response.ok) {
+      throw new Error(payload.message || "Unable to load pinned commodities");
+    }
+
+    const nextPinnedCommodities = (payload.pinnedCommodities || []).map(toCommodityCard);
+    setPinnedCommodities(nextPinnedCommodities);
+    return nextPinnedCommodities;
+  };
+
+  const loadCommodityPage = async ({ offset = 0, limit = PAGE_SIZE, append = false } = {}) => {
+    if (!token) return [];
+
+    const url = new URL(API_ENDPOINTS.COMMODITIES.LIST);
+    url.searchParams.set("offset", String(offset));
+    url.searchParams.set("limit", String(limit));
+
+    const response = await fetch(url.toString(), {
+      headers: getAuthHeaders(token),
+      credentials: "include",
+    });
+    const payload = await response.json().catch(() => ({}));
+
+    if (response.status === 401) {
+      await handleUnauthorized();
+      return [];
+    }
+
+    if (!response.ok) {
+      throw new Error(payload.message || "Unable to load commodities");
+    }
+
+    const nextCommodities = (payload.availableCommodity || []).map(toCommodityCard);
+    setHasMoreCommodities(Boolean(payload.hasMore));
+    setAvailableCommodities((currentCommodities) => (append ? [...currentCommodities, ...nextCommodities] : nextCommodities));
+    return nextCommodities;
+  };
+
+  const refreshDashboard = async () => {
+    if (!token) return;
+
+    setError("");
+
+    try {
+      const nextLimit = Math.max(PAGE_SIZE, availableCommodities.length || PAGE_SIZE);
+      await Promise.all([
+        loadPinnedCommodities(),
+        loadCommodityPage({ offset: 0, limit: nextLimit, append: false }),
+      ]);
+    } catch (fetchError) {
+      setError(fetchError.message || "Unable to refresh commodity dashboard");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleFetchMore = async () => {
+    if (!hasMoreCommodities || loadingMore) return;
+
+    setLoadingMore(true);
+    setError("");
+
+    try {
+      await loadCommodityPage({
+        offset: availableCommodities.length,
+        limit: PAGE_SIZE,
+        append: true,
+      });
+    } catch (fetchError) {
+      setError(fetchError.message || "Unable to fetch more commodities");
+    } finally {
+      setLoadingMore(false);
+    }
+  };
+
+  const handleTogglePin = async (commodity) => {
+    if (!token || syncingCommodityId) return;
+
+    const isPinned = pinnedIds.has(commodity.id);
+    setSyncingCommodityId(commodity.id);
+    setError("");
+
+    try {
+      const response = await fetch(API_ENDPOINTS.COMMODITIES.PINNED, {
+        method: isPinned ? "DELETE" : "POST",
+        headers: getAuthHeaders(token),
+        credentials: "include",
+        body: JSON.stringify({ commodityId: commodity.id }),
+      });
+      const payload = await response.json().catch(() => ({}));
+
+      if (response.status === 401) {
+        await handleUnauthorized();
+        return;
+      }
+
+      if (!response.ok) {
+        throw new Error(payload.message || "Unable to update pinned commodities");
+      }
+
+      setPinnedCommodities((payload.pinnedCommodities || []).map(toCommodityCard));
+    } catch (pinError) {
+      setError(pinError.message || "Unable to update pinned commodities");
+    } finally {
+      setSyncingCommodityId(null);
+    }
+  };
+
+  useEffect(() => {
+    refreshDashboard();
+  }, []);
+
+  useEffect(() => {
+    const intervalId = window.setInterval(() => {
+      if (token) {
+        refreshDashboard();
+      }
+    }, REFRESH_INTERVAL_MS);
+
+    return () => window.clearInterval(intervalId);
+  }, [token, availableCommodities.length]);
 
   return (
     <div className="relative min-h-screen w-full overflow-hidden bg-[#05070a] font-body text-[#e8f1f2] selection:bg-[#4ff0d7]/30">
@@ -285,25 +488,33 @@ export default function Dashboard({ onLogout }) {
 
             <div className="rounded-sm border border-[#4ff0d7]/20 bg-[#07161d]/80 px-4 py-3 shadow-[0_0_30px_rgba(79,240,215,0.08)]">
               <div className="font-mono text-[11px] uppercase tracking-[0.3em] text-[#8fa3ad]">Highest concern</div>
-              <div className="mt-1 font-display text-xl text-[#ffb454]">Crude Oil • Gulf of Hormuz</div>
+              <div className="mt-1 font-display text-xl text-[#ffb454]">
+                {loading ? "Loading live commodities" : topConcern ? `${topConcern.name} • ${topConcern.region}` : "No commodities available"}
+              </div>
             </div>
           </div>
+
+          {error ? (
+            <div className="mb-6 rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 font-mono text-[11px] uppercase tracking-[0.25em] text-red-200">
+              {error}
+            </div>
+          ) : null}
 
           <div className="grid gap-6 xl:grid-cols-[1.5fr,0.9fr]">
             <section className="rounded-xl border border-white/10 bg-[#07131a]/80 p-4 shadow-[0_0_50px_rgba(0,0,0,0.28)] backdrop-blur md:p-6">
               <div className="mb-4 flex items-center justify-between">
                 <div>
-                  <h2 className="font-display text-xl font-semibold">Top commodities</h2>
-                  <p className="mt-1 font-mono text-[11px] uppercase tracking-[0.26em] text-[#8fa3ad]">Risk level and trigger signal</p>
+                  <h2 className="font-display text-xl font-semibold">Pinned commodities</h2>
+                  <p className="mt-1 font-mono text-[11px] uppercase tracking-[0.26em] text-[#8fa3ad]">Actively tracked and auto-refreshed</p>
                 </div>
                 <div className="rounded-full border border-[#4ff0d7]/20 bg-[#4ff0d7]/10 px-3 py-1 font-mono text-[10px] uppercase tracking-[0.3em] text-[#4ff0d7]">
-                  Live view
+                  {pinnedCommodities.length} tracked
                 </div>
               </div>
 
               <div className="space-y-3">
-                {visibleCommodities.map((item, index) => (
-                  <div key={item.name} className="rounded-lg border border-white/10 bg-[#050b11]/70 p-4 transition-colors hover:border-[#4ff0d7]/20">
+                {pinnedCommodities.length > 0 ? pinnedCommodities.map((item, index) => (
+                  <div key={item.id} className="rounded-lg border border-white/10 bg-[#050b11]/70 p-4 transition-colors hover:border-[#4ff0d7]/20">
                     <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                       <div className="flex items-start gap-3">
                         <div className="flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-white/5 font-mono text-sm text-[#4ff0d7]">
@@ -325,16 +536,79 @@ export default function Dashboard({ onLogout }) {
                       {item.signal}
                     </div>
                   </div>
-                ))}
+                )) : (
+                  <div className="rounded-lg border border-dashed border-white/10 bg-[#050b11]/50 p-5 text-sm text-[#8fa3ad]">
+                    Pin commodities from the live feed below to start auto-tracking them here.
+                  </div>
+                )}
+              </div>
+            </section>
+
+            <section className="rounded-xl border border-white/10 bg-[#07131a]/80 p-4 shadow-[0_0_50px_rgba(0,0,0,0.28)] backdrop-blur md:p-6">
+              <div className="mb-4 flex items-center justify-between gap-4">
+                <div>
+                  <h2 className="font-display text-xl font-semibold">Commodity feed</h2>
+                  <p className="mt-1 font-mono text-[11px] uppercase tracking-[0.26em] text-[#8fa3ad]">Pin anything you want to watch</p>
+                </div>
+                <button
+                  onClick={handleFetchMore}
+                  disabled={!hasMoreCommodities || loadingMore}
+                  className="rounded-sm border border-[#4ff0d7]/20 bg-[#4ff0d7]/10 px-3 py-2 font-mono text-[11px] uppercase tracking-[0.3em] text-[#4ff0d7] transition-colors hover:bg-[#4ff0d7]/20 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {loadingMore ? "Fetching..." : hasMoreCommodities ? "Fetch more" : "No more"}
+                </button>
               </div>
 
-              {commodityData.length > 3 && (
-                <button
-                  onClick={() => setShowAll((value) => !value)}
-                  className="mt-4 rounded-sm border border-[#4ff0d7]/20 bg-[#4ff0d7]/10 px-3 py-2 font-mono text-[11px] uppercase tracking-[0.3em] text-[#4ff0d7] transition-colors hover:bg-[#4ff0d7]/20"
-                >
-                  {showAll ? "Show less" : "View more"}
-                </button>
+              {loading && availableCommodities.length === 0 ? (
+                <div className="rounded-lg border border-white/10 bg-[#050b11]/60 p-5 text-sm text-[#8fa3ad]">
+                  Loading live commodity feed...
+                </div>
+              ) : availableCommodities.length > 0 ? (
+                <div className="space-y-3">
+                  {availableCommodities.map((item, index) => {
+                    const isPinned = pinnedIds.has(item.id);
+
+                    return (
+                      <div key={item.id} className="rounded-lg border border-white/10 bg-[#050b11]/70 p-4 transition-colors hover:border-[#4ff0d7]/20">
+                        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                          <div className="flex items-start gap-3">
+                            <div className="flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-white/5 font-mono text-sm text-[#4ff0d7]">
+                              {index + 1}
+                            </div>
+                            <div>
+                              <div className="font-display text-lg">{item.name}</div>
+                              <div className="mt-1 font-mono text-[11px] uppercase tracking-[0.25em] text-[#8fa3ad]">{item.region}</div>
+                            </div>
+                          </div>
+
+                          <div className="flex flex-wrap items-center gap-3">
+                            <RiskPill level={item.risk} />
+                            <div className="font-mono text-xs text-[#e8f1f2]">{item.trend}</div>
+                            <button
+                              onClick={() => handleTogglePin(item)}
+                              disabled={syncingCommodityId === item.id}
+                              className={`rounded-sm border px-3 py-2 font-mono text-[11px] uppercase tracking-[0.25em] transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
+                                isPinned
+                                  ? "border-[#ffb454]/25 bg-[#ffb454]/10 text-[#ffb454] hover:bg-[#ffb454]/20"
+                                  : "border-[#4ff0d7]/20 bg-[#4ff0d7]/10 text-[#4ff0d7] hover:bg-[#4ff0d7]/20"
+                              }`}
+                            >
+                              {syncingCommodityId === item.id ? "Saving..." : isPinned ? "Unpin" : "Pin"}
+                            </button>
+                          </div>
+                        </div>
+
+                        <div className="mt-3 rounded-md border border-white/10 bg-white/5 px-3 py-2 font-body text-sm text-[#b3c0c8]">
+                          {item.signal}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="rounded-lg border border-white/10 bg-[#050b11]/60 p-5 text-sm text-[#8fa3ad]">
+                  No commodities were returned by the feed.
+                </div>
               )}
             </section>
 
@@ -357,15 +631,15 @@ export default function Dashboard({ onLogout }) {
                 <div className="font-mono text-[11px] uppercase tracking-[0.3em] text-[#8fa3ad]">Status summary</div>
                 <div className="mt-3 grid gap-3 sm:grid-cols-3">
                   <div className="rounded-lg border border-red-400/20 bg-red-500/10 p-3">
-                    <div className="font-display text-lg text-red-300">2</div>
+                    <div className="font-display text-lg text-red-300">{statusCounts.high}</div>
                     <div className="mt-1 font-mono text-[10px] uppercase tracking-[0.25em] text-red-200/70">High risk</div>
                   </div>
                   <div className="rounded-lg border border-[#ffb454]/20 bg-[#ffb454]/10 p-3">
-                    <div className="font-display text-lg text-[#ffb454]">2</div>
+                    <div className="font-display text-lg text-[#ffb454]">{statusCounts.medium}</div>
                     <div className="mt-1 font-mono text-[10px] uppercase tracking-[0.25em] text-[#ffb454]/70">Watch</div>
                   </div>
                   <div className="rounded-lg border border-[#4ff0d7]/20 bg-[#4ff0d7]/10 p-3">
-                    <div className="font-display text-lg text-[#4ff0d7]">1</div>
+                    <div className="font-display text-lg text-[#4ff0d7]">{statusCounts.low}</div>
                     <div className="mt-1 font-mono text-[10px] uppercase tracking-[0.25em] text-[#4ff0d7]/70">Stable</div>
                   </div>
                 </div>

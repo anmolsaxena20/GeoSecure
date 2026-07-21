@@ -27,6 +27,10 @@ export const API_ENDPOINTS = {
   RESERVE_OPTIMISATION: {
     DATA: `${API_BASE_URL}/api/disruption/reserve-optimisation`,
   },
+  COMMODITIES: {
+    LIST: `${API_BASE_URL}/api/commodities`,
+    PINNED: `${API_BASE_URL}/api/commodities/pinned`,
+  },
 };
 
 export default API_BASE_URL;
