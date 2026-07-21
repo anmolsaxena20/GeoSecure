@@ -21,7 +21,7 @@ function RiskPill({ level }) {
   );
 }
 
-const PAGE_SIZE = 3;
+const PAGE_SIZE = 10;
 const REFRESH_INTERVAL_MS = 30000;
 
 function getAuthHeaders(token) {
@@ -244,10 +244,8 @@ export default function Dashboard({ onLogout }) {
   const [availableCommodities, setAvailableCommodities] = useState([]);
   const [newsItems, setNewsItems] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [loadingMore, setLoadingMore] = useState(false);
   const [loadingNews, setLoadingNews] = useState(false);
   const [syncingCommodityId, setSyncingCommodityId] = useState(null);
-  const [hasMoreCommodities, setHasMoreCommodities] = useState(true);
   const [error, setError] = useState("");
 
   const token = localStorage.getItem("accessToken");
@@ -327,7 +325,6 @@ export default function Dashboard({ onLogout }) {
     }
 
     const nextCommodities = (payload.availableCommodity || []).map(toCommodityCard);
-    setHasMoreCommodities(Boolean(payload.hasMore));
     setAvailableCommodities((currentCommodities) => (append ? [...currentCommodities, ...nextCommodities] : nextCommodities));
     return nextCommodities;
   };
@@ -379,36 +376,15 @@ export default function Dashboard({ onLogout }) {
     setError("");
 
     try {
-      const nextLimit = Math.max(PAGE_SIZE, availableCommodities.length || PAGE_SIZE);
       await Promise.all([
         loadPinnedCommodities(),
-        loadCommodityPage({ offset: 0, limit: nextLimit, append: false }),
+        loadCommodityPage({ offset: 0, limit: PAGE_SIZE, append: false }),
         newsItems.length === 0 ? loadNextNewsItem() : Promise.resolve(null),
       ]);
     } catch (fetchError) {
       setError(fetchError.message || "Unable to refresh commodity dashboard");
     } finally {
       setLoading(false);
-    }
-  };
-
-  const handleFetchMore = async () => {
-    if (!hasMoreCommodities || loadingMore) return;
-
-    setLoadingMore(true);
-    setError("");
-
-    try {
-      await loadCommodityPage({
-        offset: availableCommodities.length,
-        limit: PAGE_SIZE,
-        append: true,
-      });
-      await loadNextNewsItem();
-    } catch (fetchError) {
-      setError(fetchError.message || "Unable to fetch more commodities");
-    } finally {
-      setLoadingMore(false);
     }
   };
 
@@ -514,12 +490,6 @@ export default function Dashboard({ onLogout }) {
             </div>
           </div>
 
-          {error ? (
-            <div className="mb-6 rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 font-mono text-[11px] uppercase tracking-[0.25em] text-red-200">
-              {error}
-            </div>
-          ) : null}
-
           <div className="grid gap-6 xl:grid-cols-[1.5fr,0.9fr]">
             <section className="rounded-xl border border-white/10 bg-[#07131a]/80 p-4 shadow-[0_0_50px_rgba(0,0,0,0.28)] backdrop-blur md:p-6">
               <div className="mb-4 flex items-center justify-between">
@@ -568,15 +538,11 @@ export default function Dashboard({ onLogout }) {
               <div className="mb-4 flex items-center justify-between gap-4">
                 <div>
                   <h2 className="font-display text-xl font-semibold">Commodity feed</h2>
-                  <p className="mt-1 font-mono text-[11px] uppercase tracking-[0.26em] text-[#8fa3ad]">Pin anything you want to watch</p>
+                  <p className="mt-1 font-mono text-[11px] uppercase tracking-[0.26em] text-[#8fa3ad]">Auto-loaded on page open</p>
                 </div>
-                <button
-                  onClick={handleFetchMore}
-                  disabled={!hasMoreCommodities || loadingMore}
-                  className="rounded-sm border border-[#4ff0d7]/20 bg-[#4ff0d7]/10 px-3 py-2 font-mono text-[11px] uppercase tracking-[0.3em] text-[#4ff0d7] transition-colors hover:bg-[#4ff0d7]/20 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  {loadingMore ? "Fetching..." : hasMoreCommodities ? "Fetch more" : "No more"}
-                </button>
+                <div className="rounded-full border border-[#4ff0d7]/20 bg-[#4ff0d7]/10 px-3 py-1 font-mono text-[10px] uppercase tracking-[0.3em] text-[#4ff0d7]">
+                  {availableCommodities.length} loaded
+                </div>
               </div>
 
               {loading && availableCommodities.length === 0 ? (
@@ -636,7 +602,7 @@ export default function Dashboard({ onLogout }) {
               <div className="mb-4 flex items-center justify-between gap-4">
                 <div>
                   <h2 className="font-display text-xl font-semibold">Live news</h2>
-                  <p className="mt-1 font-mono text-[11px] uppercase tracking-[0.26em] text-[#8fa3ad]">New article added on each fetch more press</p>
+                  <p className="mt-1 font-mono text-[11px] uppercase tracking-[0.26em] text-[#8fa3ad]">Live news loaded on page open</p>
                 </div>
                 <div className="rounded-full border border-[#ffb454]/20 bg-[#ffb454]/10 px-3 py-1 font-mono text-[10px] uppercase tracking-[0.3em] text-[#ffb454]">
                   {newsItems.length} shown
@@ -663,7 +629,7 @@ export default function Dashboard({ onLogout }) {
                 </div>
               ) : (
                 <div className="rounded-lg border border-white/10 bg-[#050b11]/60 p-5 text-sm text-[#8fa3ad]">
-                  Press Fetch more to load the first live news item.
+                  Live news loads automatically when the page opens.
                 </div>
               )}
             </section>
