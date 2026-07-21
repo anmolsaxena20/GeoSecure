@@ -24,6 +24,12 @@ export const API_ENDPOINTS = {
   DISRUPTION: {
     SCENARIOS: `${API_BASE_URL}/api/disruption/scenarios`,
   },
+  AI: {
+    NEWS: `${API_BASE_URL}/api/ai/news`,
+  },
+  DIGITAL_TWIN: {
+    COPILOT_CHAT: `${API_BASE_URL}/api/digitaltwin/copilot/chat`,
+  },
   RESERVE_OPTIMISATION: {
     DATA: `${API_BASE_URL}/api/disruption/reserve-optimisation`,
   },

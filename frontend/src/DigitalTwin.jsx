@@ -1,8 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { API_ENDPOINTS } from './config/api.js'
 import {
   AlertTriangle,
-  BarChart3,
   MessageCircle,
   Cpu,
   Globe,
@@ -12,7 +12,6 @@ import {
   RefreshCcw,
   ShieldCheck,
   Sparkles,
-  TrendingUp,
 } from 'lucide-react'
 
 const scenarioOptions = [
@@ -73,6 +72,9 @@ export default function DigitalTwin({ isAuthenticated, onLogout }) {
   const [selectedNode, setSelectedNode] = useState(null)
   const [nodeHealth, setNodeHealth] = useState(88)
   const [nodeDescription, setNodeDescription] = useState('')
+  const [copilotSessionId, setCopilotSessionId] = useState(null)
+  const [copilotLoading, setCopilotLoading] = useState(false)
+  const [copilotError, setCopilotError] = useState('')
   const [messages, setMessages] = useState([
     {
       id: 1,
@@ -126,13 +128,61 @@ export default function DigitalTwin({ isAuthenticated, onLogout }) {
     setChatInput('')
   }
 
-  const handleSendChat = () => {
+  const handleSendChat = async () => {
     if (!chatInput.trim()) return
-    setMessages((prev) => [
-      ...prev,
-      { id: prev.length + 1, author: 'user', content: chatInput.trim() },
-    ])
+
+    const messageText = chatInput.trim()
+    const pendingUserMessage = { id: Date.now(), author: 'user', content: messageText }
+    setMessages((prev) => [...prev, pendingUserMessage])
     setChatInput('')
+    setCopilotLoading(true)
+    setCopilotError('')
+
+    try {
+      const response = await fetch(API_ENDPOINTS.DIGITAL_TWIN.COPILOT_CHAT, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem('accessToken')}`,
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify({
+          message: messageText,
+          sessionId: copilotSessionId,
+        }),
+      })
+
+      const payload = await response.json().catch(() => ({}))
+
+      if (!response.ok) {
+        throw new Error(payload.message || 'Copilot request failed')
+      }
+
+      if (payload.sessionId) {
+        setCopilotSessionId(payload.sessionId)
+      }
+
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: Date.now() + 1,
+          author: 'assistant',
+          content: payload.response || 'No copilot response returned.',
+        },
+      ])
+    } catch (error) {
+      setCopilotError(error.message || 'Copilot request failed')
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: Date.now() + 1,
+          author: 'assistant',
+          content: `Copilot unavailable: ${error.message || 'Unknown error'}`,
+        },
+      ])
+    } finally {
+      setCopilotLoading(false)
+    }
   }
 
   const healthBadge = (value) => {
@@ -201,8 +251,8 @@ export default function DigitalTwin({ isAuthenticated, onLogout }) {
             </div>
           )}
 
-          <div className="grid gap-6 xl:grid-cols-[1.45fr,1fr]">
-            <section className="rounded-[28px] border border-white/10 bg-[#07131a]/80 p-6 shadow-[0_0_70px_rgba(0,0,0,0.28)] backdrop-blur md:p-8">
+          <div className="grid gap-6 xl:grid-cols-[minmax(0,1.45fr),minmax(0,1fr)]">
+            <section className="min-w-0 rounded-[28px] border border-white/10 bg-[#07131a]/80 p-6 shadow-[0_0_70px_rgba(0,0,0,0.28)] backdrop-blur md:p-8">
               <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
                 {kpiData.map((item) => (
                   <div key={item.label} className="rounded-3xl border border-white/10 bg-[#0c1522]/80 p-4">
@@ -372,8 +422,8 @@ export default function DigitalTwin({ isAuthenticated, onLogout }) {
               </div>
             </section>
 
-            <aside className="flex flex-col gap-6">
-              <div className="rounded-[28px] border border-white/10 bg-[#07131a]/80 p-5 shadow-[0_0_50px_rgba(0,0,0,0.28)] backdrop-blur">
+            <aside className="min-w-0 flex flex-col gap-6 self-start">
+              <div className="min-w-0 rounded-[28px] border border-white/10 bg-[#07131a]/80 p-5 shadow-[0_0_50px_rgba(0,0,0,0.28)] backdrop-blur">
                 <div className="mb-4 flex items-center justify-between gap-3">
                   <div>
                     <h2 className="font-display text-xl font-semibold">Command center</h2>
@@ -426,7 +476,7 @@ export default function DigitalTwin({ isAuthenticated, onLogout }) {
                   </button>
                 </div>
 
-                <div className="mt-6 space-y-6">
+                <div className="mt-6 space-y-6 min-w-0">
                   {activeTab === 'simulation' && (
                     <div className="space-y-6">
                       <div className="rounded-3xl border border-white/10 bg-[#0c1522]/80 p-5">
@@ -570,11 +620,11 @@ export default function DigitalTwin({ isAuthenticated, onLogout }) {
                       </div>
 
                       <div className="rounded-3xl border border-white/10 bg-[#07101d]/80 p-4">
-                        <div className="flex h-[320px] flex-col gap-3 overflow-y-auto rounded-[32px] border border-white/10 bg-[#08101d]/95 p-4 text-sm text-[#cbd5e1]">
+                        <div className="flex h-[380px] flex-col gap-3 overflow-y-auto rounded-[32px] border border-white/10 bg-[#08101d]/95 p-4 text-sm text-[#cbd5e1]">
                           {messages.map((item) => (
                             <div
                               key={item.id}
-                              className={`rounded-3xl p-4 ${
+                              className={`max-w-full rounded-3xl p-4 ${
                                 item.author === 'assistant'
                                   ? 'bg-[#081827] text-[#cbd5e1]'
                                   : 'self-end bg-[#4ff0d7]/10 text-[#e8f1f2]'
@@ -598,11 +648,15 @@ export default function DigitalTwin({ isAuthenticated, onLogout }) {
                           <button
                             type="button"
                             onClick={handleSendChat}
+                            disabled={copilotLoading}
                             className="rounded-3xl bg-[#4ff0d7] px-5 py-3 text-sm font-semibold text-[#05070a] transition hover:bg-[#3cc9d4]"
                           >
-                            Send
+                            {copilotLoading ? 'Sending...' : 'Send'}
                           </button>
                         </div>
+                        {copilotError ? (
+                          <p className="mt-3 text-xs uppercase tracking-[0.24em] text-red-300">{copilotError}</p>
+                        ) : null}
                       </div>
                     </div>
                   )}

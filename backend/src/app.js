@@ -10,6 +10,7 @@ import { errorHandler, notFound } from "./middlewares/error.middleware.js";
 import { authRouter } from "./routes/auth.routes.js";
 import { userRouter } from "./routes/user.routes.js";
 import { requireAuth } from "./middlewares/auth.middleware.js";
+import { fetchNews } from "./controllers/ai.controller.js";
 
 const app = express();
 
@@ -27,6 +28,36 @@ app.get("/", (_req, res) => {
 
 app.get("/api/ai/health", (_req, res) => {
   return res.status(200).json({ ok: true });
+});
+
+app.get("/api/ai/news", requireAuth, fetchNews);
+
+app.post("/api/digitaltwin/copilot/chat", requireAuth, async (req, res, next) => {
+  try {
+    const digitalTwinUrl = process.env.DIGITAL_TWIN_URL || "http://localhost:8085";
+    const response = await fetch(`${digitalTwinUrl.replace(/\/$/, "")}/api/digitaltwin/copilot/chat`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        message: req.body?.message,
+        sessionId: req.body?.sessionId,
+      }),
+    });
+
+    const payload = await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+      return res.status(response.status).json({
+        message: payload?.message || payload?.error || "Digital Twin copilot request failed",
+      });
+    }
+
+    return res.status(200).json(payload);
+  } catch (error) {
+    return next(error);
+  }
 });
 
 app.use("/api/auth", authRouter);

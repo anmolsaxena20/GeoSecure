@@ -3,44 +3,6 @@ import { Link, useNavigate } from "react-router-dom";
 import * as THREE from "three";
 import { API_ENDPOINTS } from "./config/api.js";
 
-const commodityData = [
-  {
-    name: "Crude Oil",
-    region: "Gulf of Hormuz",
-    risk: "High",
-    signal: "Conflict escalation and shipping disruption",
-    trend: "+12%",
-  },
-  {
-    name: "Coffee",
-    region: "Brazil",
-    risk: "Medium",
-    signal: "Weather volatility affecting supply",
-    trend: "+4%",
-  },
-  {
-    name: "Lithium",
-    region: "Chile",
-    risk: "Low",
-    signal: "Stable production and inventory buffers",
-    trend: "-2%",
-  },
-  {
-    name: "Wheat",
-    region: "Black Sea",
-    risk: "High",
-    signal: "Port restrictions and export uncertainty",
-    trend: "+9%",
-  },
-  {
-    name: "Semiconductors",
-    region: "Taiwan",
-    risk: "Medium",
-    signal: "Capacity constraints from regional weather",
-    trend: "+3%",
-  },
-];
-
 function RiskPill({ level }) {
   const normalizedLevel = String(level || "").trim().toLowerCase();
   const displayLevel = normalizedLevel ? normalizedLevel.charAt(0).toUpperCase() + normalizedLevel.slice(1) : "Unknown";
@@ -82,6 +44,20 @@ function toCommodityCard(commodity) {
     signal: `Disruption probability at ${disruptionProbability}% across the live risk feed.`,
     trend: `${disruptionProbability >= 50 ? "+" : ""}${disruptionProbability}%`,
   };
+}
+
+function toNewsCard(article) {
+  return {
+    id: article?.id || article?.url || article?.headline,
+    headline: article?.headline || "Live news update",
+    summary: article?.summary || "",
+    url: article?.url || "",
+    publishedAt: article?.published_at || article?.publishedAt || "",
+  };
+}
+
+function getNewsKey(article) {
+  return article?.id || article?.url || article?.headline || "";
 }
 
 function latLonToVector3(lat, lon, radius) {
@@ -266,8 +242,10 @@ export default function Dashboard({ onLogout }) {
   const navigate = useNavigate();
   const [pinnedCommodities, setPinnedCommodities] = useState([]);
   const [availableCommodities, setAvailableCommodities] = useState([]);
+  const [newsItems, setNewsItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [loadingNews, setLoadingNews] = useState(false);
   const [syncingCommodityId, setSyncingCommodityId] = useState(null);
   const [hasMoreCommodities, setHasMoreCommodities] = useState(true);
   const [error, setError] = useState("");
@@ -279,12 +257,11 @@ export default function Dashboard({ onLogout }) {
     [pinnedCommodities],
   );
   const topConcern = useMemo(
-    () => pinnedCommodities[0] || availableCommodities[0] || commodityData[0] || null,
+    () => pinnedCommodities[0] || availableCommodities[0] || null,
     [pinnedCommodities, availableCommodities],
   );
-  const statusSource = availableCommodities.length > 0 ? availableCommodities : commodityData;
   const statusCounts = useMemo(
-    () => statusSource.reduce(
+    () => availableCommodities.reduce(
       (accumulator, commodity) => {
         const risk = String(commodity.risk || commodity.riskLevel || "").toLowerCase();
 
@@ -296,7 +273,7 @@ export default function Dashboard({ onLogout }) {
       },
       { high: 0, medium: 0, low: 0 },
     ),
-    [statusSource],
+    [availableCommodities],
   );
 
   const handleUnauthorized = async () => {
@@ -355,6 +332,47 @@ export default function Dashboard({ onLogout }) {
     return nextCommodities;
   };
 
+  const loadNextNewsItem = async () => {
+    if (!token) return null;
+
+    setLoadingNews(true);
+
+    try {
+      const response = await fetch(API_ENDPOINTS.AI.NEWS, {
+        headers: getAuthHeaders(token),
+        credentials: "include",
+      });
+      const payload = await response.json().catch(() => ([]));
+
+      if (response.status === 401) {
+        await handleUnauthorized();
+        return null;
+      }
+
+      if (!response.ok) {
+        throw new Error(payload.message || "Unable to load AI news");
+      }
+
+      const nextBatch = (Array.isArray(payload) ? payload : payload?.results || payload?.articles || []).map(toNewsCard);
+
+      let appendedNews = null;
+      setNewsItems((currentItems) => {
+        const seenKeys = new Set(currentItems.map(getNewsKey));
+        appendedNews = nextBatch.find((item) => !seenKeys.has(getNewsKey(item))) || null;
+
+        if (!appendedNews) {
+          return currentItems;
+        }
+
+        return [...currentItems, appendedNews];
+      });
+
+      return appendedNews;
+    } finally {
+      setLoadingNews(false);
+    }
+  };
+
   const refreshDashboard = async () => {
     if (!token) return;
 
@@ -365,6 +383,7 @@ export default function Dashboard({ onLogout }) {
       await Promise.all([
         loadPinnedCommodities(),
         loadCommodityPage({ offset: 0, limit: nextLimit, append: false }),
+        newsItems.length === 0 ? loadNextNewsItem() : Promise.resolve(null),
       ]);
     } catch (fetchError) {
       setError(fetchError.message || "Unable to refresh commodity dashboard");
@@ -385,6 +404,7 @@ export default function Dashboard({ onLogout }) {
         limit: PAGE_SIZE,
         append: true,
       });
+      await loadNextNewsItem();
     } catch (fetchError) {
       setError(fetchError.message || "Unable to fetch more commodities");
     } finally {
@@ -608,6 +628,42 @@ export default function Dashboard({ onLogout }) {
               ) : (
                 <div className="rounded-lg border border-white/10 bg-[#050b11]/60 p-5 text-sm text-[#8fa3ad]">
                   No commodities were returned by the feed.
+                </div>
+              )}
+            </section>
+
+            <section className="rounded-xl border border-white/10 bg-[#07131a]/80 p-4 shadow-[0_0_50px_rgba(0,0,0,0.28)] backdrop-blur md:p-6">
+              <div className="mb-4 flex items-center justify-between gap-4">
+                <div>
+                  <h2 className="font-display text-xl font-semibold">Live news</h2>
+                  <p className="mt-1 font-mono text-[11px] uppercase tracking-[0.26em] text-[#8fa3ad]">New article added on each fetch more press</p>
+                </div>
+                <div className="rounded-full border border-[#ffb454]/20 bg-[#ffb454]/10 px-3 py-1 font-mono text-[10px] uppercase tracking-[0.3em] text-[#ffb454]">
+                  {newsItems.length} shown
+                </div>
+              </div>
+
+              {loadingNews && newsItems.length === 0 ? (
+                <div className="rounded-lg border border-white/10 bg-[#050b11]/60 p-5 text-sm text-[#8fa3ad]">
+                  Loading AI news...
+                </div>
+              ) : newsItems.length > 0 ? (
+                <div className="space-y-3">
+                  {newsItems.map((item) => (
+                    <article key={item.id} className="rounded-lg border border-white/10 bg-[#050b11]/70 p-4">
+                      <div className="font-display text-lg text-[#e8f1f2]">{item.headline}</div>
+                      {item.publishedAt ? (
+                        <div className="mt-1 font-mono text-[10px] uppercase tracking-[0.25em] text-[#8fa3ad]">
+                          {new Date(item.publishedAt).toLocaleString()}
+                        </div>
+                      ) : null}
+                      <div className="mt-3 text-sm text-[#b3c0c8]">{item.summary || "No summary available."}</div>
+                    </article>
+                  ))}
+                </div>
+              ) : (
+                <div className="rounded-lg border border-white/10 bg-[#050b11]/60 p-5 text-sm text-[#8fa3ad]">
+                  Press Fetch more to load the first live news item.
                 </div>
               )}
             </section>

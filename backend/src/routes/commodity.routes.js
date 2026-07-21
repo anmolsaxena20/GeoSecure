@@ -11,5 +11,6 @@ const router = Router();
 router.get("/pinned", getPinnedCommodities);
 router.delete("/pinned", deletePinnedCommodity);
 router.post("/pinned", pinCommodity);
+router.get("/", showAvailableCommodities);
 router.get("/commodities", showAvailableCommodities);
 export { router as commodityRouter };
