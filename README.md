@@ -2,7 +2,7 @@
 
 A comprehensive platform combining geospatial analysis, AI-driven insights, and secure backend infrastructure for risk assessment, market analysis, and supply chain optimization.
 
-## Project Architecture
+## Project Architecture:
 
 GeoSecure is structured as a modular full-stack application with the following components:
 
