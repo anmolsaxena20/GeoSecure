@@ -24,6 +24,8 @@ const disruptionCacheKeys = {
   GetCorridorRiskScores: "cache:disruption:corridors",
   GetCommodityRiskScores: "cache:disruption:commodities",
   GetProcurementRecommendations: "cache:procurement:recommendations",
+  RunStrategicReserveAgent: "cache:reserve:run",
+  RunSupplyAgent: "cache:supply_agent:run",
 };
 
 const parseCachedValue = (value) => {
@@ -197,3 +199,20 @@ export const getReserveOptimisationData = async (_req, res, next) => {
     return next(error);
   }
 };
+
+export const runStrategicReserveAgent = async (_req, res, next) => {
+  try {
+    return await sendAiResult(res, "RunStrategicReserveAgent");
+  } catch (error) {
+    return next(error);
+  }
+};
+
+export const runSupplyAgent = async (_req, res, next) => {
+  try {
+    return await sendAiResult(res, "RunSupplyAgent");
+  } catch (error) {
+    return next(error);
+  }
+};
+

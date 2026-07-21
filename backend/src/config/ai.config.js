@@ -27,6 +27,30 @@ const routeMap = {
     method: "GET",
     path: "/api/ai/procurement/recommendations",
   },
+  RunStrategicReserveAgent: {
+    method: "POST",
+    path: "/api/ai/reserve/run",
+  },
+  RunSupplyAgent: {
+    method: "POST",
+    path: "/api/ai/supply-agent/run",
+  },
+  CopilotChat: {
+    method: "POST",
+    path: "/api/ai/copilot/chat",
+  },
+  CreateCopilotSession: {
+    method: "POST",
+    path: "/api/ai/copilot/sessions",
+  },
+  GetCopilotUserSessions: {
+    method: "GET",
+    path: "/api/ai/copilot/sessions/:userId",
+  },
+  GetCopilotSessionMessages: {
+    method: "GET",
+    path: "/api/ai/copilot/sessions/:sessionId/messages",
+  },
 };
 
 const normalizeBaseUrl = (value) => {
@@ -68,7 +92,7 @@ const parseResponseBody = async (response) => {
   }
 };
 
-const invokeUnary = async (methodName, request = {}) => {
+const invokeUnary = async (methodName, request = {}, pathParams = {}) => {
   const route = routeMap[methodName];
 
   if (!route) {
@@ -79,7 +103,14 @@ const invokeUnary = async (methodName, request = {}) => {
     throw missingApiKeyError();
   }
 
-  const response = await fetch(`${serviceUrl}${route.path}`, {
+  let targetPath = route.path;
+  if (pathParams && typeof pathParams === "object") {
+    Object.keys(pathParams).forEach((key) => {
+      targetPath = targetPath.replace(`:${key}`, encodeURIComponent(pathParams[key]));
+    });
+  }
+
+  const response = await fetch(`${serviceUrl}${targetPath}`, {
     method: route.method,
     headers: {
       "content-type": "application/json",

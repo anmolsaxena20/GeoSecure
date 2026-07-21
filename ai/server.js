@@ -17,6 +17,14 @@ import {
   getProcurementRecommendations,
   runProcurementOrchestrator,
 } from "./controllers/procurementController.js";
+import { runStrategicReserveAgent } from "./controllers/reserveController.js";
+import { runSupplyAgent } from "./controllers/supplyAgentController.js";
+import {
+  chatWithCopilot,
+  createSession,
+  getUserSessions,
+  getSessionMessages,
+} from "./agents/supply_chain_copilot/copilotController.js";
 import { startNewsCron } from "./polling/pollingAgent.js";
 
 const app = express();
@@ -143,6 +151,31 @@ app.get(
       return next(error);
     }
   },
+);
+
+app.post("/api/ai/reserve/run", requireApiKey, async (_req, res, next) => {
+  try {
+    return await sendJson(res, runStrategicReserveAgent);
+  } catch (error) {
+    return next(error);
+  }
+});
+
+app.post("/api/ai/supply-agent/run", requireApiKey, async (_req, res, next) => {
+  try {
+    return await sendJson(res, runSupplyAgent);
+  } catch (error) {
+    return next(error);
+  }
+});
+
+app.post("/api/ai/copilot/chat", requireApiKey, chatWithCopilot);
+app.post("/api/ai/copilot/sessions", requireApiKey, createSession);
+app.get("/api/ai/copilot/sessions/:userId", requireApiKey, getUserSessions);
+app.get(
+  "/api/ai/copilot/sessions/:sessionId/messages",
+  requireApiKey,
+  getSessionMessages,
 );
 
 app.use((error, _req, res, _next) => {

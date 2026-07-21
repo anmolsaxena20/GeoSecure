@@ -471,10 +471,14 @@ await this.appendLog({
   }
 }
 
-const runOnce = process.argv.includes("--once");
+export { SupplyChainLangGraphPollingAgent };
 
-const agent = new SupplyChainLangGraphPollingAgent();
-agent.start({ runOnce }).catch((error) => {
-  console.error("[agent] Fatal startup error:", error.message);
-  process.exit(1);
-});
+if (process.argv[1] && process.argv[1].endsWith("supply_chain_polling_agent.js")) {
+  const runOnce = process.argv.includes("--once");
+  const agent = new SupplyChainLangGraphPollingAgent();
+  agent.start({ runOnce }).catch((error) => {
+    console.error("[agent] Fatal startup error:", error.message);
+    process.exit(1);
+  });
+}
+
