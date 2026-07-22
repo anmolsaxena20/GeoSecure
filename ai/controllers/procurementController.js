@@ -1,4 +1,4 @@
-import { AdaptiveProcurementOrchestrator } from "../agents/adaptive_procurement_orchestrator.js";
+import { AdaptiveProcurementOrchestrator, ensureProcurementTablesExist } from "../agents/adaptive_procurement_orchestrator.js";
 import { pool } from "../db/db.js";
 
 /**
@@ -19,8 +19,15 @@ export async function runProcurementOrchestrator() {
  * @returns {Promise<Array>} List of procurement recommendations sorted by date descending
  */
 export async function getProcurementRecommendations() {
-    const result = await pool.query(
-        "SELECT * FROM procurement_recommendations ORDER BY created_at DESC, id DESC;"
-    );
-    return result.rows;
+    try {
+        await ensureProcurementTablesExist();
+        const result = await pool.query(
+            "SELECT * FROM procurement_recommendations ORDER BY created_at DESC, id DESC;"
+        );
+        return result.rows;
+    } catch (error) {
+        console.error("[procurement] Error fetching procurement recommendations:", error);
+        return [];
+    }
 }
+

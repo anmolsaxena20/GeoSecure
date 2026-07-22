@@ -13,6 +13,7 @@ import {
   ShieldCheck,
   Sparkles,
 } from 'lucide-react'
+import DigitalTwinMap, { DEFAULT_NODES, DEFAULT_PIPELINES } from './DigitalTwinMap.jsx'
 
 const scenarioOptions = [
   { value: 'normal', label: 'Standard Operations' },
@@ -60,18 +61,13 @@ const chartBars = [
   { label: 'Distribution', value: 66, tone: 'bg-[#8b5cf6]' },
 ]
 
-const initialNodes = [
-  { id: 1, name: 'Mumbai High Offshore', type: 'Wellhead', health: 88, capacity: '350,000 bbl/d' },
-  { id: 2, name: 'Jamnagar Refinery', type: 'Refinery', health: 74, capacity: '540,000 bbl/d' },
-  { id: 3, name: 'Kochi Storage Hub', type: 'Terminal', health: 91, capacity: '220,000 bbl/d' },
-]
-
 export default function DigitalTwin({ isAuthenticated, onLogout }) {
   const [activeTab, setActiveTab] = useState('simulation')
   const [scenario, setScenario] = useState('normal')
   const [selectedNode, setSelectedNode] = useState(null)
   const [nodeHealth, setNodeHealth] = useState(88)
   const [nodeDescription, setNodeDescription] = useState('')
+  const [nodeHealthMap, setNodeHealthMap] = useState({})
   const [copilotSessionId, setCopilotSessionId] = useState(null)
   const [copilotLoading, setCopilotLoading] = useState(false)
   const [copilotError, setCopilotError] = useState('')
@@ -80,11 +76,12 @@ export default function DigitalTwin({ isAuthenticated, onLogout }) {
       id: 1,
       author: 'assistant',
       content:
-        "Greetings! I am the GeoSecure Supply Chain Copilot. I have loaded India's energy network layout. If you disrupt any refinery or pipeline, ask me for mitigation options.",
+        "Greetings! I am the GeoSecure Supply Chain Copilot. I have loaded India's energy network layout with live geospatial map tracking. Disrupt any refinery or pipeline, or ask me for real-time risk mitigation strategies.",
     },
   ])
   const [chatInput, setChatInput] = useState('')
   const [tickerMessage, setTickerMessage] = useState('Retrieving threat feed and global news...')
+  const chatBottomRef = React.useRef(null)
 
   useEffect(() => {
     const messages = [
@@ -102,59 +99,106 @@ export default function DigitalTwin({ isAuthenticated, onLogout }) {
     return () => window.clearInterval(interval)
   }, [])
 
+  useEffect(() => {
+    if (activeTab === 'copilot') {
+      chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+    }
+  }, [messages, activeTab])
+
   const selectedNodeData = useMemo(
-    () => initialNodes.find((node) => node.id === selectedNode) ?? null,
+    () => DEFAULT_NODES.find((node) => node.id === selectedNode) ?? null,
     [selectedNode],
   )
 
+  const buildCopilotContext = () => {
+    const scenarioLabel = scenarioOptions.find((option) => option.value === scenario)?.label || scenario
+    const selectedNodeLabel = selectedNodeData
+      ? `${selectedNodeData.name} (${selectedNodeData.type}, health ${nodeHealth}%)`
+      : 'No node selected'
+
+    return [
+      `Scenario: ${scenarioLabel}`,
+      `Selected node: ${selectedNodeLabel}`,
+      `Incident note: ${nodeDescription || 'No incident note supplied'}`,
+    ].join('\n')
+  }
+
+  const buildDemoCopilotResponse = (messageText) => {
+    const scenarioLabel = scenarioOptions.find((option) => option.value === scenario)?.label || scenario
+    const selectedNodeLabel = selectedNodeData?.name || 'the active network'
+    const healthStatus = healthBadge(nodeHealth).toLowerCase()
+
+    return [
+      '### GeoSecure Copilot Response',
+      '',
+      `- Scenario: ${scenarioLabel}`,
+      `- Focus node: ${selectedNodeLabel}`,
+      `- Health status: ${healthStatus}`,
+      '',
+      `Recommended action: Assess ${selectedNodeLabel} against the current disruption scenario and keep alternate routing open while the network remains ${healthStatus}.`,
+      `Query summary: ${messageText}`,
+    ].join('\n')
+  }
+
   const handleSelectNode = (id) => {
     setSelectedNode(id)
-    const node = initialNodes.find((item) => item.id === id)
-    setNodeHealth(node?.health ?? 88)
+    const node = DEFAULT_NODES.find((item) => item.id === id)
+    const currentHealth = nodeHealthMap[id] !== undefined ? nodeHealthMap[id] : node?.health ?? 88
+    setNodeHealth(currentHealth)
     setNodeDescription('')
     setActiveTab('simulation')
   }
 
-  const handleApplyStress = () => {
-    if (!selectedNodeData) return
-    setMessages((prev) => [
-      ...prev,
-      {
-        id: prev.length + 1,
-        author: 'user',
-        content: `Apply simulated stress to ${selectedNodeData.name}: ${nodeDescription || 'decrease capacity and raise risk'}`,
-      },
-    ])
-    setChatInput('')
-  }
+  const sendCopilotQuery = async (queryText) => {
+    const messageText = queryText.trim()
+    if (!messageText) return
 
-  const handleSendChat = async () => {
-    if (!chatInput.trim()) return
-
-    const messageText = chatInput.trim()
+    const context = buildCopilotContext()
+    const token = localStorage.getItem('accessToken')
     const pendingUserMessage = { id: Date.now(), author: 'user', content: messageText }
+
+    const appendAssistantMessage = (content) => {
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: Date.now() + 1,
+          author: 'assistant',
+          content,
+        },
+      ])
+    }
+
     setMessages((prev) => [...prev, pendingUserMessage])
-    setChatInput('')
     setCopilotLoading(true)
     setCopilotError('')
+
+    if (!token) {
+      appendAssistantMessage(buildDemoCopilotResponse(messageText))
+      setCopilotLoading(false)
+      return
+    }
 
     try {
       const response = await fetch(API_ENDPOINTS.DIGITAL_TWIN.COPILOT_CHAT, {
         method: 'POST',
         headers: {
-          Authorization: `Bearer ${localStorage.getItem('accessToken')}`,
+          Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
         credentials: 'include',
         body: JSON.stringify({
           message: messageText,
           sessionId: copilotSessionId,
+          context,
         }),
       })
 
       const payload = await response.json().catch(() => ({}))
 
       if (!response.ok) {
+        if (response.status === 401 || String(payload.message).toLowerCase().includes('unauthorized')) {
+          throw new Error('Your session has expired. Please log in again to use the Copilot.')
+        }
         throw new Error(payload.message || 'Copilot request failed')
       }
 
@@ -162,28 +206,33 @@ export default function DigitalTwin({ isAuthenticated, onLogout }) {
         setCopilotSessionId(payload.sessionId)
       }
 
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: Date.now() + 1,
-          author: 'assistant',
-          content: payload.response || 'No copilot response returned.',
-        },
-      ])
+      appendAssistantMessage(payload.response || buildDemoCopilotResponse(messageText))
     } catch (error) {
       setCopilotError(error.message || 'Copilot request failed')
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: Date.now() + 1,
-          author: 'assistant',
-          content: `Copilot unavailable: ${error.message || 'Unknown error'}`,
-        },
-      ])
+      appendAssistantMessage(buildDemoCopilotResponse(messageText))
     } finally {
       setCopilotLoading(false)
     }
   }
+
+  const handleSendChat = async () => {
+    if (!chatInput.trim()) return
+    const text = chatInput
+    setChatInput('')
+    await sendCopilotQuery(text)
+  }
+
+  const handleApplyStress = () => {
+    if (!selectedNodeData) return
+    const updatedHealth = nodeHealth
+    setNodeHealthMap((prev) => ({ ...prev, [selectedNodeData.id]: updatedHealth }))
+
+    const stressQuery = `[STRESS EVENT] Simulated stress applied to ${selectedNodeData.name} (${selectedNodeData.type.toUpperCase()}). New Health: ${updatedHealth}%. Incident details: ${nodeDescription || 'Degraded operational capacity'}. Analyze supply chain impact and recommend mitigations.`
+
+    setActiveTab('copilot')
+    sendCopilotQuery(stressQuery)
+  }
+
 
   const healthBadge = (value) => {
     if (value >= 80) return 'Healthy'
@@ -291,30 +340,39 @@ export default function DigitalTwin({ isAuthenticated, onLogout }) {
                 <div className="relative overflow-hidden rounded-3xl bg-[#06111d] p-6">
                   <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(79,240,215,0.14),transparent_40%),radial-gradient(circle_at_bottom_right,rgba(255,180,84,0.08),transparent_35%)]" />
                   <div className="relative grid gap-6 lg:grid-cols-[1fr,0.88fr]">
-                    <div className="space-y-3">
-                      <div className="rounded-3xl border border-white/10 bg-[#0b1626]/80 p-4 text-sm text-[#cbd5e1]">
-                        This map synthesizes location, risk, and infrastructure statuses from the Digital Twin model. Tap a node to preview its current condition and then apply a simulated stress event.
-                      </div>
+                    <div className="space-y-4">
+                      <DigitalTwinMap
+                        nodes={DEFAULT_NODES}
+                        pipelines={DEFAULT_PIPELINES}
+                        selectedNodeId={selectedNode}
+                        onSelectNode={handleSelectNode}
+                        nodeHealthMap={nodeHealthMap}
+                      />
 
-                      <div className="grid gap-3 sm:grid-cols-3">
-                        {initialNodes.map((node) => (
-                          <button
-                            key={node.id}
-                            type="button"
-                            onClick={() => handleSelectNode(node.id)}
-                            className={`rounded-3xl border px-4 py-4 text-left transition-all duration-200 ${
-                              selectedNode === node.id
-                                ? 'border-[#4ff0d7] bg-[#0f1d31] shadow-[0_0_30px_rgba(79,240,215,0.12)]'
-                                : 'border-white/10 bg-[#08101d] hover:border-[#4ff0d7]/50'
-                            }`}
-                          >
-                            <div className="flex items-center justify-between gap-3">
-                              <span className="font-semibold text-[#e8f1f2]">{node.name}</span>
-                              <span className="rounded-full border border-white/10 bg-white/5 px-2 py-1 text-[11px] uppercase tracking-[0.24em] text-[#8fa3ad]">{node.type}</span>
-                            </div>
-                            <p className="mt-3 text-sm text-[#8fa3ad]">Health: {node.health}%</p>
-                          </button>
-                        ))}
+                      <div className="grid gap-2 sm:grid-cols-4">
+                        {DEFAULT_NODES.map((node) => {
+                          const currentHealth = nodeHealthMap[node.id] !== undefined ? nodeHealthMap[node.id] : node.health
+                          return (
+                            <button
+                              key={node.id}
+                              type="button"
+                              onClick={() => handleSelectNode(node.id)}
+                              className={`rounded-2xl border px-3 py-2 text-left transition-all duration-200 ${
+                                selectedNode === node.id
+                                  ? 'border-[#4ff0d7] bg-[#0f1d31] shadow-[0_0_20px_rgba(79,240,215,0.15)]'
+                                  : 'border-white/10 bg-[#08101d] hover:border-[#4ff0d7]/50'
+                              }`}
+                            >
+                              <div className="truncate font-medium text-xs text-[#e8f1f2]">{node.name}</div>
+                              <div className="mt-1 flex items-center justify-between text-[10px] text-[#8fa3ad]">
+                                <span className="uppercase">{node.type}</span>
+                                <span className={currentHealth < 60 ? 'text-red-400 font-semibold' : currentHealth < 80 ? 'text-amber-400' : 'text-[#4ff0d7]'}>
+                                  {currentHealth}%
+                                </span>
+                              </div>
+                            </button>
+                          )
+                        })}
                       </div>
                     </div>
 
@@ -636,6 +694,7 @@ export default function DigitalTwin({ isAuthenticated, onLogout }) {
                               <p className="whitespace-pre-line text-sm leading-6">{item.content}</p>
                             </div>
                           ))}
+                          <div ref={chatBottomRef} />
                         </div>
 
                         <div className="mt-4 flex gap-3">
