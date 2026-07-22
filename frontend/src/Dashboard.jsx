@@ -351,20 +351,8 @@ export default function Dashboard({ onLogout }) {
       }
 
       const nextBatch = (Array.isArray(payload) ? payload : payload?.results || payload?.articles || []).map(toNewsCard);
-
-      let appendedNews = null;
-      setNewsItems((currentItems) => {
-        const seenKeys = new Set(currentItems.map(getNewsKey));
-        appendedNews = nextBatch.find((item) => !seenKeys.has(getNewsKey(item))) || null;
-
-        if (!appendedNews) {
-          return currentItems;
-        }
-
-        return [...currentItems, appendedNews];
-      });
-
-      return appendedNews;
+      setNewsItems(nextBatch);
+      return nextBatch;
     } finally {
       setLoadingNews(false);
     }
@@ -379,7 +367,7 @@ export default function Dashboard({ onLogout }) {
       await Promise.all([
         loadPinnedCommodities(),
         loadCommodityPage({ offset: 0, limit: PAGE_SIZE, append: false }),
-        newsItems.length === 0 ? loadNextNewsItem() : Promise.resolve(null),
+        loadNextNewsItem(),
       ]);
     } catch (fetchError) {
       setError(fetchError.message || "Unable to refresh commodity dashboard");

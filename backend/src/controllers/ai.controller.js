@@ -1,5 +1,6 @@
 import { aiHttpCall } from "../config/ai.config.js";
 import { getRedisClient } from "../config/redis.config.js";
+import { prisma } from "../config/db.config.js";
 import { promises as fs } from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
@@ -106,7 +107,22 @@ export const fetchMarketData = async (_req, res, next) => {
 
 export const fetchNews = async (_req, res, next) => {
   try {
-    return await sendAiResult(res, "FetchNews");
+    const articles = await prisma.article.findMany({
+      orderBy: { publishedAt: "desc" },
+      take: 10,
+    });
+
+    const serializedArticles = articles.map((article) => ({
+      id: article.id.toString(),
+      source: article.source,
+      externalId: article.externalId,
+      headline: article.headline,
+      url: article.url,
+      publishedAt: article.publishedAt ? article.publishedAt.toISOString() : null,
+      summary: article.rawContent || "",
+    }));
+
+    return res.status(200).json(serializedArticles);
   } catch (error) {
     return next(error);
   }
