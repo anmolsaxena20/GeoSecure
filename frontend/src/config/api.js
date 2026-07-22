@@ -10,6 +10,7 @@ export const API_ENDPOINTS = {
     GOOGLE: `${API_BASE_URL}/api/auth/google`,
   },
   USERS: {
+    
     PROFILE: `${API_BASE_URL}/api/users/me`,
     UPDATE: `${API_BASE_URL}/api/users/me`,
     PASSWORD: `${API_BASE_URL}/api/users/me/password`,
