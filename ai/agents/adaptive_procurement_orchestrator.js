@@ -1210,4 +1210,4 @@ if (process.argv[1] && (process.argv[1].endsWith("adaptive_procurement_orchestra
     });
 }
 
-export { AdaptiveProcurementOrchestrator };
+export { AdaptiveProcurementOrchestrator, ensureTablesExist as ensureProcurementTablesExist };

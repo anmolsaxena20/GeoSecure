@@ -29,14 +29,16 @@ import { startNewsCron } from "./polling/pollingAgent.js";
 
 const app = express();
 const port = process.env.PORT || 8000;
-const expectedApiKey = process.env.AI_SERVICE_API_KEY;
 
 const sendJson = async (res, resolver) => {
+
   const result = await resolver();
   return res.status(200).json(result);
 };
 
 const requireApiKey = (req, res, next) => {
+
+  const expectedApiKey = process.env.AI_SERVICE_API_KEY;
   if (!expectedApiKey) {
     return res
       .status(500)
@@ -50,6 +52,7 @@ const requireApiKey = (req, res, next) => {
 
   return next();
 };
+
 
 app.use(express.json());
 

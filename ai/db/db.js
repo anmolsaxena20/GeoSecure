@@ -12,9 +12,13 @@ import pg from "pg";
 
 const { Pool } = pg;
 
+const isSslRequired = process.env.DATABASE_URL?.includes("sslmode=require") || process.env.DATABASE_URL?.includes("neon.tech");
+
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
+  ...(isSslRequired ? { ssl: { rejectUnauthorized: false } } : {}),
 });
+
 
 try {
   const result = await pool.query("SELECT 1");
