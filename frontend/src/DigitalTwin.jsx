@@ -300,6 +300,153 @@ export default function DigitalTwin({ isAuthenticated, onLogout }) {
             </div>
           )}
 
+          {/* Network Simulator Card spanning 100% of content width */}
+          <div className="mb-6 rounded-[28px] border border-white/10 bg-[#07131a]/80 p-6 shadow-[0_0_70px_rgba(0,0,0,0.28)] backdrop-blur md:p-8">
+            <div className="mb-4 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <h2 className="font-display text-xl font-semibold">Network simulator</h2>
+                <p className="mt-1 text-sm text-[#8fa3ad]">Choose a preset to emulate regional energy events in the Digital Twin.</p>
+              </div>
+              <div className="flex items-center gap-3 rounded-3xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-[#e8f1f2]">
+                <Sparkles className="h-4 w-4 text-[#4ff0d7]" />
+                <select
+                  value={scenario}
+                  onChange={(event) => setScenario(event.target.value)}
+                  className="min-w-[190px] bg-transparent text-sm text-[#e8f1f2] outline-none"
+                >
+                  {scenarioOptions.map((option) => (
+                    <option key={option.value} value={option.value} className="bg-[#05070a] text-[#e8f1f2]">
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div className="relative overflow-hidden rounded-3xl bg-[#06111d] p-6">
+              <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(79,240,215,0.14),transparent_40%),radial-gradient(circle_at_bottom_right,rgba(255,180,84,0.08),transparent_35%)]" />
+              
+              {/* Map occupies the entire width of the panel */}
+              <DigitalTwinMap
+                nodes={DEFAULT_NODES}
+                pipelines={DEFAULT_PIPELINES}
+                selectedNodeId={selectedNode}
+                onSelectNode={handleSelectNode}
+                nodeHealthMap={nodeHealthMap}
+                className="h-[520px] md:h-[620px] w-full mb-6"
+              />
+
+              {/* Grid for controls below the map */}
+              <div className="relative grid gap-6 lg:grid-cols-[1.2fr,0.8fr]">
+                <div className="space-y-4">
+                  <div className="mb-2">
+                    <h3 className="font-display text-sm font-semibold uppercase tracking-[0.2em] text-[#4ff0d7]">Select Node from Network</h3>
+                    <p className="text-xs text-[#8fa3ad] mt-0.5">Click any infrastructure node to configure parameters and run stress tests.</p>
+                  </div>
+                  <div className="grid gap-2 grid-cols-2 sm:grid-cols-4">
+                    {DEFAULT_NODES.map((node) => {
+                      const currentHealth = nodeHealthMap[node.id] !== undefined ? nodeHealthMap[node.id] : node.health
+                      return (
+                        <button
+                          key={node.id}
+                          type="button"
+                          onClick={() => handleSelectNode(node.id)}
+                          className={`rounded-2xl border px-3 py-2 text-left transition-all duration-200 ${
+                            selectedNode === node.id
+                              ? 'border-[#4ff0d7] bg-[#0f1d31] shadow-[0_0_20px_rgba(79,240,215,0.15)]'
+                              : 'border-white/10 bg-[#08101d] hover:border-[#4ff0d7]/50'
+                          }`}
+                        >
+                          <div className="truncate font-medium text-xs text-[#e8f1f2]">{node.name}</div>
+                          <div className="mt-1 flex items-center justify-between text-[10px] text-[#8fa3ad]">
+                            <span className="uppercase">{node.type}</span>
+                            <span className={currentHealth < 60 ? 'text-red-400 font-semibold' : currentHealth < 80 ? 'text-amber-400' : 'text-[#4ff0d7]'}>
+                              {currentHealth}%
+                            </span>
+                          </div>
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+
+                <div className="rounded-[28px] border border-white/10 bg-[#07121c]/90 p-5 shadow-[0_0_40px_rgba(0,0,0,0.22)]">
+                  <div className="mb-4 flex items-center gap-3">
+                    <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#4ff0d7]/10 text-[#4ff0d7]">
+                      <MapPin className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <p className="text-xs uppercase tracking-[0.3em] text-[#8fa3ad]">Selected node</p>
+                      <h3 className="mt-1 text-lg font-semibold text-[#e8f1f2]">{selectedNodeData?.name ?? 'Tap a node to begin'}</h3>
+                    </div>
+                  </div>
+
+                  {selectedNodeData ? (
+                    <div className="space-y-5">
+                      <div className="rounded-3xl border border-white/10 bg-[#0b1422]/80 p-4">
+                        <div className="flex items-center justify-between text-sm text-[#8fa3ad]">
+                          <span>Operational health</span>
+                          <span className="font-semibold text-[#e8f1f2]">{nodeHealth}%</span>
+                        </div>
+                        <input
+                          type="range"
+                          min="0"
+                          max="100"
+                          value={nodeHealth}
+                          onChange={(event) => setNodeHealth(Number(event.target.value))}
+                          className="mt-3 w-full accent-[#4ff0d7]"
+                        />
+                        <div className="mt-2 flex items-center justify-between text-[11px] uppercase tracking-[0.24em] text-[#8fa3ad]">
+                          <span>0% Disrupted</span>
+                          <span>100% Healthy</span>
+                        </div>
+                      </div>
+
+                      <div className="rounded-3xl border border-white/10 bg-[#0b1422]/80 p-4">
+                        <div className="flex items-center justify-between text-sm text-[#8fa3ad]">
+                          <span>Production capacity</span>
+                          <span className="font-semibold text-[#e8f1f2]">{selectedNodeData.capacity}</span>
+                        </div>
+                        <p className="mt-3 text-sm text-[#cbd5e1]">Health status: <span className="font-medium text-[#4ff0d7]">{healthBadge(nodeHealth)}</span></p>
+                      </div>
+
+                      <label className="block text-sm text-[#8fa3ad]">
+                        Active incident description
+                        <textarea
+                          value={nodeDescription}
+                          onChange={(event) => setNodeDescription(event.target.value)}
+                          placeholder="e.g. Cyclone damage to offshore platform..."
+                          className="mt-3 h-24 w-full rounded-3xl border border-white/10 bg-[#04111f]/90 p-4 text-sm text-[#e8f1f2] outline-none placeholder:text-[#6b7280]"
+                        />
+                      </label>
+
+                      <div className="flex flex-col gap-3 sm:flex-row">
+                        <button
+                          type="button"
+                          onClick={handleApplyStress}
+                          className="flex-1 rounded-3xl bg-[#4ff0d7] px-4 py-3 text-sm font-semibold text-[#05070a] transition hover:bg-[#3cc9d4]"
+                        >
+                          <Play className="mr-2 inline-block h-4 w-4" /> Apply Stress
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setSelectedNode(null)}
+                          className="flex-1 rounded-3xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-semibold text-[#e8f1f2] transition hover:border-[#4ff0d7]/30 hover:text-[#4ff0d7]"
+                        >
+                          <RefreshCcw className="mr-2 inline-block h-4 w-4" /> Clear Selection
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="rounded-3xl border border-dashed border-white/10 bg-[#08101c]/80 p-8 text-center text-sm text-[#8fa3ad]">
+                      Select a node on the map panel to inspect its details and run a simulated disruption.
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+
           <div className="grid gap-6 xl:grid-cols-[minmax(0,1.45fr),minmax(0,1fr)]">
             <section className="min-w-0 rounded-[28px] border border-white/10 bg-[#07131a]/80 p-6 shadow-[0_0_70px_rgba(0,0,0,0.28)] backdrop-blur md:p-8">
               <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -313,144 +460,6 @@ export default function DigitalTwin({ isAuthenticated, onLogout }) {
                     <p className="mt-2 text-sm text-[#8fa3ad]">{item.sub}</p>
                   </div>
                 ))}
-              </div>
-
-              <div className="mt-6 rounded-[28px] border border-white/10 bg-[#091018]/80 p-4 shadow-[inset_0_0_0_1px_rgba(79,240,215,0.05)]">
-                <div className="mb-4 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                  <div>
-                    <h2 className="font-display text-xl font-semibold">Network simulator</h2>
-                    <p className="mt-1 text-sm text-[#8fa3ad]">Choose a preset to emulate regional energy events in the Digital Twin.</p>
-                  </div>
-                  <div className="flex items-center gap-3 rounded-3xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-[#e8f1f2]">
-                    <Sparkles className="h-4 w-4 text-[#4ff0d7]" />
-                    <select
-                      value={scenario}
-                      onChange={(event) => setScenario(event.target.value)}
-                      className="min-w-[190px] bg-transparent text-sm text-[#e8f1f2] outline-none"
-                    >
-                      {scenarioOptions.map((option) => (
-                        <option key={option.value} value={option.value} className="bg-[#05070a] text-[#e8f1f2]">
-                          {option.label}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-
-                <div className="relative overflow-hidden rounded-3xl bg-[#06111d] p-6">
-                  <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(79,240,215,0.14),transparent_40%),radial-gradient(circle_at_bottom_right,rgba(255,180,84,0.08),transparent_35%)]" />
-                  <div className="relative grid gap-6 lg:grid-cols-[1fr,0.88fr]">
-                    <div className="space-y-4">
-                      <DigitalTwinMap
-                        nodes={DEFAULT_NODES}
-                        pipelines={DEFAULT_PIPELINES}
-                        selectedNodeId={selectedNode}
-                        onSelectNode={handleSelectNode}
-                        nodeHealthMap={nodeHealthMap}
-                      />
-
-                      <div className="grid gap-2 sm:grid-cols-4">
-                        {DEFAULT_NODES.map((node) => {
-                          const currentHealth = nodeHealthMap[node.id] !== undefined ? nodeHealthMap[node.id] : node.health
-                          return (
-                            <button
-                              key={node.id}
-                              type="button"
-                              onClick={() => handleSelectNode(node.id)}
-                              className={`rounded-2xl border px-3 py-2 text-left transition-all duration-200 ${
-                                selectedNode === node.id
-                                  ? 'border-[#4ff0d7] bg-[#0f1d31] shadow-[0_0_20px_rgba(79,240,215,0.15)]'
-                                  : 'border-white/10 bg-[#08101d] hover:border-[#4ff0d7]/50'
-                              }`}
-                            >
-                              <div className="truncate font-medium text-xs text-[#e8f1f2]">{node.name}</div>
-                              <div className="mt-1 flex items-center justify-between text-[10px] text-[#8fa3ad]">
-                                <span className="uppercase">{node.type}</span>
-                                <span className={currentHealth < 60 ? 'text-red-400 font-semibold' : currentHealth < 80 ? 'text-amber-400' : 'text-[#4ff0d7]'}>
-                                  {currentHealth}%
-                                </span>
-                              </div>
-                            </button>
-                          )
-                        })}
-                      </div>
-                    </div>
-
-                    <div className="rounded-[28px] border border-white/10 bg-[#07121c]/90 p-5 shadow-[0_0_40px_rgba(0,0,0,0.22)]">
-                      <div className="mb-4 flex items-center gap-3">
-                        <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#4ff0d7]/10 text-[#4ff0d7]">
-                          <MapPin className="h-5 w-5" />
-                        </div>
-                        <div>
-                          <p className="text-xs uppercase tracking-[0.3em] text-[#8fa3ad]">Selected node</p>
-                          <h3 className="mt-1 text-lg font-semibold text-[#e8f1f2]">{selectedNodeData?.name ?? 'Tap a node to begin'}</h3>
-                        </div>
-                      </div>
-
-                      {selectedNodeData ? (
-                        <div className="space-y-5">
-                          <div className="rounded-3xl border border-white/10 bg-[#0b1422]/80 p-4">
-                            <div className="flex items-center justify-between text-sm text-[#8fa3ad]">
-                              <span>Operational health</span>
-                              <span className="font-semibold text-[#e8f1f2]">{nodeHealth}%</span>
-                            </div>
-                            <input
-                              type="range"
-                              min="0"
-                              max="100"
-                              value={nodeHealth}
-                              onChange={(event) => setNodeHealth(Number(event.target.value))}
-                              className="mt-3 w-full accent-[#4ff0d7]"
-                            />
-                            <div className="mt-2 flex items-center justify-between text-[11px] uppercase tracking-[0.24em] text-[#8fa3ad]">
-                              <span>0% Disrupted</span>
-                              <span>100% Healthy</span>
-                            </div>
-                          </div>
-
-                          <div className="rounded-3xl border border-white/10 bg-[#0b1422]/80 p-4">
-                            <div className="flex items-center justify-between text-sm text-[#8fa3ad]">
-                              <span>Production capacity</span>
-                              <span className="font-semibold text-[#e8f1f2]">{selectedNodeData.capacity}</span>
-                            </div>
-                            <p className="mt-3 text-sm text-[#cbd5e1]">Health status: <span className="font-medium text-[#4ff0d7]">{healthBadge(nodeHealth)}</span></p>
-                          </div>
-
-                          <label className="block text-sm text-[#8fa3ad]">
-                            Active incident description
-                            <textarea
-                              value={nodeDescription}
-                              onChange={(event) => setNodeDescription(event.target.value)}
-                              placeholder="e.g. Cyclone damage to offshore platform..."
-                              className="mt-3 h-24 w-full rounded-3xl border border-white/10 bg-[#04111f]/90 p-4 text-sm text-[#e8f1f2] outline-none placeholder:text-[#6b7280]"
-                            />
-                          </label>
-
-                          <div className="flex flex-col gap-3 sm:flex-row">
-                            <button
-                              type="button"
-                              onClick={handleApplyStress}
-                              className="flex-1 rounded-3xl bg-[#4ff0d7] px-4 py-3 text-sm font-semibold text-[#05070a] transition hover:bg-[#3cc9d4]"
-                            >
-                              <Play className="mr-2 inline-block h-4 w-4" /> Apply Stress
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => setSelectedNode(null)}
-                              className="flex-1 rounded-3xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-semibold text-[#e8f1f2] transition hover:border-[#4ff0d7]/30 hover:text-[#4ff0d7]"
-                            >
-                              <RefreshCcw className="mr-2 inline-block h-4 w-4" /> Clear Selection
-                            </button>
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="rounded-3xl border border-dashed border-white/10 bg-[#08101c]/80 p-8 text-center text-sm text-[#8fa3ad]">
-                          Select a node on the map panel to inspect its details and run a simulated disruption.
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
               </div>
 
               <div className="mt-6 rounded-[28px] border border-white/10 bg-[#0b1422]/80 p-6 shadow-[0_0_40px_rgba(0,0,0,0.24)]">

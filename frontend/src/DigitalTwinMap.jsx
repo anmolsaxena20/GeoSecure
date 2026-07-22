@@ -38,6 +38,7 @@ export default function DigitalTwinMap({
   selectedNodeId,
   onSelectNode,
   nodeHealthMap = {},
+  className = 'h-[550px]',
 }) {
   const mapContainerRef = useRef(null)
   const mapInstanceRef = useRef(null)
@@ -259,7 +260,7 @@ export default function DigitalTwinMap({
   }, [nodes, pipelines, selectedNodeId, nodeHealthMap, onSelectNode])
 
   return (
-    <div className="relative h-[380px] w-full overflow-hidden rounded-3xl border border-white/10 shadow-[inset_0_0_30px_rgba(0,0,0,0.5)]">
+    <div className={`relative w-full overflow-hidden rounded-3xl border border-white/10 shadow-[inset_0_0_30px_rgba(0,0,0,0.5)] ${className}`}>
       <div ref={mapContainerRef} className="h-full w-full bg-[#05070a]" />
       <div className="pointer-events-none absolute bottom-3 right-3 rounded-full border border-white/10 bg-[#07131a]/80 px-3 py-1 text-[10px] font-mono uppercase tracking-[0.25em] text-[#4ff0d7]">
         Live Geospatial Layer
@@ -267,3 +268,4 @@ export default function DigitalTwinMap({
     </div>
   )
 }
+
