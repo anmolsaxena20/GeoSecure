@@ -1,3 +1,8 @@
+import crypto from "node:crypto";
+if (!globalThis.crypto) {
+  globalThis.crypto = crypto;
+}
+
 import dotenv from "dotenv";
 import path from "path";
 import { fileURLToPath } from "url";

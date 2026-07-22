@@ -1,3 +1,8 @@
+import crypto from "node:crypto";
+if (!globalThis.crypto) {
+  globalThis.crypto = crypto;
+}
+
 import axios from "axios";
 import cron from "node-cron";
 import dotenv from "dotenv";
