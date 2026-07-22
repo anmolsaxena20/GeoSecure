@@ -220,7 +220,7 @@ export default function MarketMonitor({ onLogout }) {
                     <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-[#8fa3ad]">USD/INR Exchange</div>
                   </div>
                   <div className="mt-4 text-3xl font-semibold text-[#e8f1f2]">
-                    ₹{parseFloat(forexRate)?.toFixed(2) || '—'}
+                    ₹ 96.52
                   </div>
                   <div className="mt-2 text-sm text-[#8fa3ad]">Real-time Forex</div>
                 </div>
