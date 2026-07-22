@@ -10,6 +10,7 @@ import DigitalTwin from './DigitalTwin.jsx'
 import ProcumentOrchestrator from './ProcumentOrchestrator.jsx'
 import DisruptionScenario from './DisruptionScenario.jsx'
 import ReserveOptimisation from './ReserveOptimisation.jsx'
+import MarketMonitor from './MarketMonitor.jsx'
 import { API_ENDPOINTS } from './config/api.js'
 import Dashboard from './Dashboard.jsx'
 
@@ -126,6 +127,10 @@ export default function App() {
           element={isAuthenticated ? <Profile onLogout={handleLogout} /> : <Navigate to="/login" />}
         />
         <Route path="/digitaltwin" element={<DigitalTwin isAuthenticated={isAuthenticated} onLogout={handleLogout} />} />
+        <Route
+          path="/market-monitor"
+          element={isAuthenticated ? <MarketMonitor onLogout={handleLogout} /> : <Navigate to="/login" />}
+        />
         <Route path="*" element={<Navigate to="/" />} />
       </Routes>
     </Router>

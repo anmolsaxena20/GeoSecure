@@ -618,6 +618,12 @@ export default function GeoSecureHome({ isAuthenticated, onLogout }) {
                   Disruption Scenario
                 </Link>
                 <Link
+                  to="/market-monitor"
+                  className="transition-colors hover:text-slate-900 dark:hover:text-[#e8f1f2]"
+                >
+                  Market Monitor
+                </Link>
+                <Link
                   to="/reserve-optimisation"
                   className="transition-colors hover:text-slate-900 dark:hover:text-[#e8f1f2]"
                 >
@@ -717,6 +723,12 @@ export default function GeoSecureHome({ isAuthenticated, onLogout }) {
                     className="rounded-sm border border-[#ffb454]/30 bg-[#ffb454]/10 px-6 py-3 font-mono text-xs font-semibold uppercase tracking-widest text-[#ffb454] transition-colors hover:bg-[#ffb454]/20 dark:border-[#ffb454]/30 dark:bg-[#ffb454]/10 dark:text-[#ffb454] dark:hover:bg-[#ffb454]/20"
                   >
                     Disruption Scenario
+                  </Link>
+                  <Link
+                    to="/market-monitor"
+                    className="rounded-sm border border-[#3b82f6]/30 bg-[#3b82f6]/10 px-6 py-3 font-mono text-xs font-semibold uppercase tracking-widest text-[#3b82f6] transition-colors hover:bg-[#3b82f6]/20 dark:border-[#3b82f6]/30 dark:bg-[#3b82f6]/10 dark:text-[#3b82f6] dark:hover:bg-[#3b82f6]/20"
+                  >
+                    Market Monitor
                   </Link>
                   <Link
                     to="/reserve-optimisation"

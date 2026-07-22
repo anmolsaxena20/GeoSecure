@@ -1,5 +1,5 @@
-import { getMarketSnapshot } from "../services/marketService.js";
+import { fetchMarketSignals } from "../services/marketAggregator.js";
 
 export async function fetchMarketData() {
-    return await getMarketSnapshot();
+    return await fetchMarketSignals();
 }

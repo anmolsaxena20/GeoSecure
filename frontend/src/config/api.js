@@ -27,6 +27,7 @@ export const API_ENDPOINTS = {
   },
   AI: {
     NEWS: `${API_BASE_URL}/api/ai/news`,
+    MARKET: `${API_BASE_URL}/api/ai/market`,
   },
   DIGITAL_TWIN: {
     COPILOT_CHAT: `${API_BASE_URL}/api/digitaltwin/copilot/chat`,

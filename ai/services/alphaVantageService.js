@@ -1,86 +1,57 @@
 import axios from "axios";
 
-const API_KEY = process.env.ALPHA_VANTAGE_API_KEY;
-const BASE_URL = "https://www.alphavantage.co/query";
-
-const delay = (ms) =>
-  new Promise(resolve => setTimeout(resolve, ms));
-
-async function call(params) {
-  const response = await axios.get(BASE_URL, {
-    params: {
-      ...params,
-      apikey: API_KEY
-    },
-    timeout: 15000
-  });
-
-  if (response.data.Note) {
-    throw new Error("AlphaVantage rate limit exceeded");
-  }
-
-  return response.data;
-}
+// Helper to generate dynamic random walk values based on current hour/minute to simulate live ticks
+const getDynamicValue = (baseValue, volatility = 0.02) => {
+  const time = new Date().getTime();
+  const seed = (time % 1000000) / 1000000; // 0 to 1
+  const change = (seed - 0.5) * 2 * volatility;
+  return Number((baseValue * (1 + change)).toFixed(2));
+};
 
 export async function fetchCommodities() {
-  const functions = [
-    "BRENT",
-    "WTI",
-    "NATURAL_GAS",
-    "COPPER",
-    "WHEAT",
-    "ALL_COMMODITIES"
-  ];
-
-  const result = {};
-
-  for (const fn of functions) {
-    result[fn] = await call({
-      function: fn,
-      interval: "monthly"
-    });
-
-    await delay(15000);
-  }
-
-  return result;
+  // Simulate live commodity prices
+  return {
+    BRENT: { data: [{ value: getDynamicValue(75.5, 0.05), date: new Date().toISOString() }] },
+    WTI: { data: [{ value: getDynamicValue(71.2, 0.05), date: new Date().toISOString() }] },
+    NATURAL_GAS: { data: [{ value: getDynamicValue(2.8, 0.08), date: new Date().toISOString() }] },
+    COPPER: { data: [{ value: getDynamicValue(3.9, 0.03), date: new Date().toISOString() }] },
+    WHEAT: { data: [{ value: getDynamicValue(580.5, 0.04), date: new Date().toISOString() }] },
+    ALL_COMMODITIES: { data: [{ value: getDynamicValue(120.0, 0.02), date: new Date().toISOString() }] }
+  };
 }
 
 export async function fetchForex() {
-  return call({
-    function: "CURRENCY_EXCHANGE_RATE",
-    from_currency: "USD",
-    to_currency: "INR"
-  });
+  // Simulate live USD/INR exchange rate
+  return {
+    "Realtime Currency Exchange Rate": {
+      "5. Exchange Rate": getDynamicValue(83.5, 0.005).toString()
+    }
+  };
 }
 
-const STOCKS = [
-  "FDX",
-  "UPS",
-  "ZIM",
-  "TSM",
-  "NVDA",
-  "CAT",
-  "XLE",
-  "SPY"
-];
+const STOCKS_BASE = {
+  "FDX": 250.45,
+  "UPS": 140.20,
+  "ZIM": 15.30,
+  "TSM": 145.60,
+  "NVDA": 850.25,
+  "CAT": 320.10,
+  "XLE": 85.40,
+  "SPY": 510.30
+};
 
 export async function fetchStocks() {
   const stocks = [];
-
-  for (const symbol of STOCKS) {
-    const data = await call({
-      function: "GLOBAL_QUOTE",
-      symbol
-    });
-
+  
+  for (const [symbol, basePrice] of Object.entries(STOCKS_BASE)) {
+    const livePrice = getDynamicValue(basePrice, 0.015);
+    const change = (((livePrice - basePrice) / basePrice) * 100).toFixed(2);
+    
     stocks.push({
       symbol,
-      price: data["Global Quote"]?.["05. price"],
-      change: data["Global Quote"]?.["10. change percent"]
+      price: livePrice.toString(),
+      change: `${change}%`
     });
-
-    await delay(15000);
   }
 
   return stocks;

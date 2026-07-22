@@ -11,7 +11,7 @@ import { errorHandler, notFound } from "./middlewares/error.middleware.js";
 import { authRouter } from "./routes/auth.routes.js";
 import { userRouter } from "./routes/user.routes.js";
 import { requireAuth } from "./middlewares/auth.middleware.js";
-import { fetchNews } from "./controllers/ai.controller.js";
+import { fetchNews, fetchMarketData } from "./controllers/ai.controller.js";
 
 const app = express();
 
@@ -32,6 +32,7 @@ app.get("/api/ai/health", (_req, res) => {
 });
 
 app.get("/api/ai/news", requireAuth, fetchNews);
+app.get("/api/ai/market", requireAuth, fetchMarketData);
 
 app.post("/api/digitaltwin/copilot/chat", requireAuth, async (req, res, next) => {
   try {
